@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
+import { RANDOM_EVENTS } from '../../data/moods'
 
 function ResourceDisplay({ label, value, icon, glowClass, prevValue }) {
   const [diff, setDiff] = useState(null)
@@ -40,12 +41,30 @@ function ResourceDisplay({ label, value, icon, glowClass, prevValue }) {
   )
 }
 
+function getHappinessEmoji(happiness) {
+  if (happiness >= 80) return '😊'
+  if (happiness >= 60) return '😐'
+  if (happiness >= 40) return '😟'
+  if (happiness >= 20) return '😠'
+  return '😡'
+}
+
+function getHappinessColor(happiness) {
+  if (happiness >= 80) return 'text-green-400'
+  if (happiness >= 60) return 'text-yellow-400'
+  if (happiness >= 40) return 'text-orange-400'
+  return 'text-red-400'
+}
+
 export default function TopBar() {
   const resources = useStore((s) => s.resources)
   const buildings = useStore((s) => s.buildings)
   const population = useStore((s) => s.population)
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
   const tradeBoostTimer = useStore((s) => s.tradeBoostTimer)
+  const villageHappiness = useStore((s) => s.villageHappiness)
+  const activeRandomEvent = useStore((s) => s.activeRandomEvent)
+  const randomEventTimer = useStore((s) => s.randomEventTimer)
   const [prev, setPrev] = useState(resources)
 
   useEffect(() => {
@@ -54,6 +73,7 @@ export default function TopBar() {
   }, [resources])
 
   const activeBuildings = buildings.filter((b) => b.status === 'active').length
+  const evt = activeRandomEvent ? RANDOM_EVENTS[activeRandomEvent] : null
 
   return (
     <motion.div
@@ -104,6 +124,9 @@ export default function TopBar() {
 
       <div className="flex items-center gap-3 text-sm text-zinc-400">
         <span>👥 {population}</span>
+        <span className={`${getHappinessColor(villageHappiness)}`}>
+          {getHappinessEmoji(villageHappiness)} {villageHappiness}%
+        </span>
         <span className="hidden sm:inline">·</span>
         <span className="hidden sm:inline">{activeBuildings} buildings</span>
         {tradeBoostActive && (
@@ -113,6 +136,15 @@ export default function TopBar() {
             className="text-amber-300 font-bold"
           >
             2x BOOST {tradeBoostTimer}s
+          </motion.span>
+        )}
+        {evt && (
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="text-cyan-300 font-bold"
+          >
+            {evt.emoji} {evt.label} {randomEventTimer}s
           </motion.span>
         )}
       </div>

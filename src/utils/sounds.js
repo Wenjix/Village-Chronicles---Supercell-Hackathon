@@ -49,3 +49,21 @@ export function playUpgrade() {
 export function playClick() {
   playTone(800, 0.05, 'sine', 0.1)
 }
+
+export function playRefusal() {
+  playTone(300, 0.1, 'sawtooth', 0.15)
+  setTimeout(() => playTone(200, 0.2, 'sawtooth', 0.12), 100)
+}
+
+export function playNegotiateSuccess() {
+  playTone(523, 0.1, 'sine', 0.15)
+  setTimeout(() => playTone(659, 0.1, 'sine', 0.15), 80)
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.2), 160)
+}
+
+export function playRandomEvent() {
+  playTone(400, 0.08, 'triangle', 0.15)
+  setTimeout(() => playTone(600, 0.08, 'triangle', 0.15), 60)
+  setTimeout(() => playTone(500, 0.08, 'triangle', 0.15), 120)
+  setTimeout(() => playTone(800, 0.15, 'triangle', 0.2), 180)
+}
