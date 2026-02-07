@@ -1,8 +1,40 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
 import { BUILDINGS, BUILDING_TYPES } from '../../data/buildings'
 import { gridToWorld } from '../../utils/gridUtils'
 import useStore from '../../store/useStore'
+
+const RESOURCE_ICONS = { gears: '\u2699', steam: '\u2601', crystals: '\u25c6' }
+const RESOURCE_COLORS = { gears: '#b5891c', steam: '#d4d4d8', crystals: '#a855f7' }
+
+function ResourcePopup({ resource, amount }) {
+  const ref = useRef()
+  const [visible, setVisible] = useState(true)
+  const progress = useRef(0)
+
+  useFrame((_, delta) => {
+    if (!ref.current || !visible) return
+    progress.current += delta
+    ref.current.position.y += delta * 1.2
+    if (progress.current > 1) setVisible(false)
+  })
+
+  if (!visible) return null
+
+  return (
+    <group ref={ref} position={[0, 1.3, 0]}>
+      <Html center style={{ pointerEvents: 'none' }}>
+        <span
+          className="animate-float-up font-bold text-sm whitespace-nowrap"
+          style={{ color: RESOURCE_COLORS[resource] || '#fff' }}
+        >
+          +{amount} {RESOURCE_ICONS[resource] || resource}
+        </span>
+      </Html>
+    </group>
+  )
+}
 
 function RotatingGear({ position, size = 0.3 }) {
   const ref = useRef()
@@ -180,26 +212,74 @@ const BUILDING_COMPONENTS = {
 
 export default function Building({ building }) {
   const groupRef = useRef()
+  const prevStatus = useRef(building.status)
+  const animPhase = useRef('idle')
+  const animScale = useRef(building.status === 'building' ? 0.5 : 1)
   const selectBuilding = useStore((s) => s.selectBuilding)
+  const resourcePopups = useStore((s) => s.resourcePopups)
+  const [popups, setPopups] = useState([])
+  const popupKey = useRef(0)
   const [wx, , wz] = gridToWorld(building.gridX, building.gridY)
+
+  // Show resource popup when this building produces
+  useEffect(() => {
+    const mine = resourcePopups.filter((p) => p.buildingId === building.id)
+    if (mine.length > 0) {
+      mine.forEach((p) => {
+        setPopups((prev) => [
+          ...prev.slice(-3), // keep max 4
+          { key: popupKey.current++, resource: p.resource, amount: p.amount },
+        ])
+      })
+    }
+  }, [resourcePopups])
   const Component = BUILDING_COMPONENTS[building.type]
   const isBuilding = building.status === 'building'
   const active = building.status === 'active'
 
-  // Construction animation: pulse scale
-  useFrame((state) => {
+  // Detect transition from building → active
+  if (prevStatus.current === 'building' && building.status === 'active') {
+    animPhase.current = 'pop_up'
+    animScale.current = 0.5
+  }
+  prevStatus.current = building.status
+
+  // Squash & stretch animation
+  useFrame((state, delta) => {
     if (!groupRef.current) return
+    const phase = animPhase.current
+
     if (isBuilding) {
+      // Gentle pulse during construction
       const pulse = 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.1
-      groupRef.current.scale.setScalar(pulse)
-    } else {
-      // Smooth scale to 1
-      const s = groupRef.current.scale.x
-      if (s < 0.99) {
-        groupRef.current.scale.setScalar(s + (1 - s) * 0.08)
-      } else {
-        groupRef.current.scale.setScalar(1)
+      animScale.current = pulse
+    } else if (phase === 'pop_up') {
+      // Scale up to 1.25 (overshoot)
+      animScale.current += delta * 4
+      if (animScale.current >= 1.25) {
+        animScale.current = 1.25
+        animPhase.current = 'pop_down'
       }
+    } else if (phase === 'pop_down') {
+      // Settle back to 1.0
+      animScale.current += (1.0 - animScale.current) * 0.12
+      if (Math.abs(animScale.current - 1.0) < 0.005) {
+        animScale.current = 1.0
+        animPhase.current = 'done'
+      }
+    } else {
+      animScale.current = 1.0
+    }
+
+    // Apply with Y-axis squash/stretch
+    const s = animScale.current
+    if (phase === 'pop_up' || phase === 'pop_down') {
+      // Squash X/Z, stretch Y for cartoon effect
+      const yStretch = s * 1.1
+      const xzSquash = s * 0.95
+      groupRef.current.scale.set(xzSquash, yStretch, xzSquash)
+    } else {
+      groupRef.current.scale.setScalar(s)
     }
   })
 
@@ -223,6 +303,9 @@ export default function Building({ building }) {
           <meshStandardMaterial color="#facc15" emissive="#facc15" emissiveIntensity={1} />
         </mesh>
       )}
+      {popups.map((p) => (
+        <ResourcePopup key={p.key} resource={p.resource} amount={p.amount} />
+      ))}
     </group>
   )
 }
