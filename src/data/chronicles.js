@@ -35,8 +35,65 @@ export const CHRONICLE_TEMPLATES = {
   ],
 }
 
+export const MOOD_CHRONICLE_TEMPLATES = {
+  proposed: [
+    "Plans for a new {building} have been drawn up. The council seeks a willing worker to begin construction.",
+    "A {building} has been proposed! Now, who shall take up the task of building it?",
+  ],
+  assigned: [
+    "{villager} has accepted the task of constructing the {building}. Tools in hand, they march toward the site.",
+    "The chronicler notes: {villager} sets forth to build the {building}, determination in their stride.",
+  ],
+  refusal: [
+    "{villager} has refused to work on the {building}! Their {mood} mood makes them uncooperative.",
+    "A setback — {villager} will not lift a finger for the {building}. Perhaps persuasion is in order.",
+  ],
+  negotiation: [
+    "Through careful words and patience, {villager}'s spirits have been lifted. Their mood improves from {oldMood} to {newMood}.",
+    "The village leader's diplomacy prevails! {villager} feels better after a thoughtful conversation.",
+  ],
+  feud: [
+    "Tensions boil over! {villager} and {target} have begun a bitter feud. The settlement's harmony is shaken.",
+    "The chronicler records with dismay: {villager} and {target} exchange harsh words. A feud erupts!",
+  ],
+  completion_happy: [
+    "{villager}, whistling a merry tune, puts the finishing touches on the {building}. A job well done!",
+    "With a satisfied grin, {villager} completes the {building}. Happy workers build the finest structures.",
+  ],
+  completion_tired: [
+    "{villager} collapses against the finished {building}, exhausted but proud. It took everything they had.",
+    "Bleary-eyed but determined, {villager} hammers the last nail into the {building}. Rest is well-earned.",
+  ],
+  completion_grumpy: [
+    "{villager} finishes the {building} with a scowl. 'It's done. Don't ask me for anything else today.'",
+    "Despite their foul mood, {villager} completes the {building}. Quality work, if begrudging.",
+  ],
+  completion_lazy: [
+    "At long last, {villager} finishes the {building}. It took twice as long, but it's done... barely.",
+    "{villager} yawns and stretches beside the completed {building}. 'See? I told you I'd get to it eventually.'",
+  ],
+  completion_feuding: [
+    "{villager} finishes the {building} despite the ongoing feud. 'I did this for the village, not for THEM.'",
+    "The {building} is complete — {villager} built it fueled by spite alone. Impressive, if concerning.",
+  ],
+  random_event: [
+    "A strange wind blows through the settlement... {event}!",
+    "The chronicler hastily scribbles: an unexpected turn — {event}!",
+  ],
+}
+
 export function getRandomChronicle(key) {
   const templates = CHRONICLE_TEMPLATES[key]
   if (!templates || templates.length === 0) return null
   return templates[Math.floor(Math.random() * templates.length)]
+}
+
+export function getMoodChronicle(key, replacements = {}) {
+  const templates = MOOD_CHRONICLE_TEMPLATES[key]
+  if (!templates || templates.length === 0) return null
+  let text = templates[Math.floor(Math.random() * templates.length)]
+  for (const [token, value] of Object.entries(replacements)) {
+    text = text.replace(new RegExp(`\\{${token}\\}`, 'g'), value)
+  }
+  return text
 }
