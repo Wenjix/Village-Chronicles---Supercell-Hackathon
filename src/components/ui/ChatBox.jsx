@@ -42,7 +42,7 @@ export default function ChatBox() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 panel rounded-xl p-4 w-[90vw] max-w-md"
+          className="fixed z-50 panel p-4 sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:rounded-xl sm:w-[90vw] sm:max-w-md bottom-0 left-0 right-0 rounded-t-2xl"
         >
           <div className="flex justify-between items-center mb-3">
             <div>

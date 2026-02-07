@@ -31,7 +31,7 @@ export default function BuildMenu() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 panel rounded-xl p-4 w-[90vw] max-w-lg"
+          className="fixed z-50 panel p-4 sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:rounded-xl sm:w-[90vw] sm:max-w-lg bottom-0 left-0 right-0 rounded-t-2xl max-h-[70vh] overflow-y-auto"
         >
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-medieval text-lg text-amber-400">
