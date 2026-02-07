@@ -214,7 +214,11 @@ export default function Building({ building }) {
   const groupRef = useRef()
   const prevStatus = useRef(building.status)
   const animPhase = useRef('idle')
-  const animScale = useRef(building.status === 'building' ? 0.5 : 1)
+  const animScale = useRef(
+    building.status === 'building' ? 0.5
+    : building.status === 'proposed' || building.status === 'assigned' ? 1
+    : 1
+  )
   const selectBuilding = useStore((s) => s.selectBuilding)
   const resourcePopups = useStore((s) => s.resourcePopups)
   const [popups, setPopups] = useState([])
@@ -227,41 +231,71 @@ export default function Building({ building }) {
     if (mine.length > 0) {
       mine.forEach((p) => {
         setPopups((prev) => [
-          ...prev.slice(-3), // keep max 4
+          ...prev.slice(-3),
           { key: popupKey.current++, resource: p.resource, amount: p.amount },
         ])
       })
     }
   }, [resourcePopups])
+
   const Component = BUILDING_COMPONENTS[building.type]
+  const isProposed = building.status === 'proposed'
+  const isAssigned = building.status === 'assigned'
   const isBuilding = building.status === 'building'
   const active = building.status === 'active'
+  const isGhost = isProposed || isAssigned
 
-  // Detect transition from building → active
+  // Detect transitions for pop animation
   if (prevStatus.current === 'building' && building.status === 'active') {
+    animPhase.current = 'pop_up'
+    animScale.current = 0.5
+  }
+  if (prevStatus.current === 'assigned' && building.status === 'building') {
     animPhase.current = 'pop_up'
     animScale.current = 0.5
   }
   prevStatus.current = building.status
 
-  // Squash & stretch animation
+  // Squash & stretch + ghost pulse animation
   useFrame((state, delta) => {
     if (!groupRef.current) return
     const phase = animPhase.current
 
-    if (isBuilding) {
-      // Gentle pulse during construction
+    if (isGhost) {
+      // Ghost pulsing opacity
+      const pulse = 0.2 + Math.sin(state.clock.elapsedTime * 2) * 0.1
+      const targetOpacity = isAssigned ? pulse + 0.15 : pulse
+      groupRef.current.traverse((child) => {
+        if (child.material) {
+          child.material.transparent = true
+          child.material.opacity = targetOpacity
+        }
+      })
+      animScale.current = 1
+    } else if (isBuilding) {
       const pulse = 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.1
       animScale.current = pulse
+      // Restore full opacity
+      groupRef.current.traverse((child) => {
+        if (child.material && child.material.transparent) {
+          child.material.opacity = 1
+          child.material.transparent = false
+        }
+      })
     } else if (phase === 'pop_up') {
-      // Scale up to 1.25 (overshoot)
       animScale.current += delta * 4
       if (animScale.current >= 1.25) {
         animScale.current = 1.25
         animPhase.current = 'pop_down'
       }
+      // Restore opacity on transition
+      groupRef.current.traverse((child) => {
+        if (child.material && child.material.transparent) {
+          child.material.opacity = 1
+          child.material.transparent = false
+        }
+      })
     } else if (phase === 'pop_down') {
-      // Settle back to 1.0
       animScale.current += (1.0 - animScale.current) * 0.12
       if (Math.abs(animScale.current - 1.0) < 0.005) {
         animScale.current = 1.0
@@ -271,10 +305,8 @@ export default function Building({ building }) {
       animScale.current = 1.0
     }
 
-    // Apply with Y-axis squash/stretch
     const s = animScale.current
     if (phase === 'pop_up' || phase === 'pop_down') {
-      // Squash X/Z, stretch Y for cartoon effect
       const yStretch = s * 1.1
       const xzSquash = s * 0.95
       groupRef.current.scale.set(xzSquash, yStretch, xzSquash)
@@ -297,11 +329,24 @@ export default function Building({ building }) {
       onPointerOut={() => (document.body.style.cursor = 'default')}
     >
       <Component active={active} />
+      {/* Construction indicator */}
       {isBuilding && (
         <mesh position={[0, 1.2, 0]}>
           <sphereGeometry args={[0.08, 8, 8]} />
           <meshStandardMaterial color="#facc15" emissive="#facc15" emissiveIntensity={1} />
         </mesh>
+      )}
+      {/* Proposed indicator */}
+      {isProposed && (
+        <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
+          <span className="text-xs text-cyan-400 font-bold animate-pulse">NEEDS WORKER</span>
+        </Html>
+      )}
+      {/* Assigned indicator */}
+      {isAssigned && (
+        <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
+          <span className="text-xs text-blue-400 font-bold">WORKER EN ROUTE</span>
+        </Html>
       )}
       {popups.map((p) => (
         <ResourcePopup key={p.key} resource={p.resource} amount={p.amount} />
