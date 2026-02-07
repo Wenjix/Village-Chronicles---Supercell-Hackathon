@@ -2,13 +2,17 @@ import { create } from 'zustand'
 import { BUILDINGS, canAfford } from '../data/buildings'
 import { getRandomChronicle } from '../data/chronicles'
 import { GRID_SIZE, createEmptyGrid } from '../utils/gridUtils'
+import { playBuildStart, playBuildComplete, playUpgrade } from '../utils/sounds'
 
 let nextBuildingId = 1
 let nextEventId = 1
 
 const useStore = create((set, get) => ({
   // Resources
-  resources: { gears: 100, steam: 0, crystals: 0 },
+  resources: { gears: 100, steam: 0, crystals: 0, blueprints: 0 },
+
+  // Population — grows with active buildings
+  population: 3,
 
   // Buildings placed on grid
   buildings: [],
@@ -70,6 +74,7 @@ const useStore = create((set, get) => ({
         selectedCell: null,
       }
     })
+    playBuildStart()
     return true
   },
 
@@ -119,6 +124,8 @@ const useStore = create((set, get) => ({
               }
             }
 
+            playBuildComplete()
+
             // Activate airship dock boost
             if (BUILDINGS[b.type].special === 'trade_boost') {
               return { ...b, status: 'active', timer: 0, boostReady: true }
@@ -133,18 +140,36 @@ const useStore = create((set, get) => ({
 
       // Produce resources from active buildings
       const multiplier = s.tradeBoostActive ? 2 : 1
+      let blueprintTick = false
       newBuildings.forEach((b) => {
         if (b.status === 'active') {
           const def = BUILDINGS[b.type]
-          if (def.produces) {
+          if (def.produces && Object.keys(def.produces).length > 0) {
             Object.entries(def.produces).forEach(([resource, amount]) => {
-              const gain = amount * multiplier
+              const gain = amount * multiplier * (b.level || 1)
               newResources[resource] = (newResources[resource] || 0) + gain
               popups.push({ resource, amount: gain, buildingId: b.id })
             })
           }
+          // Workshop produces 1 blueprint every 10 ticks
+          if (def.special === 'blueprints') {
+            if (!b._bpTimer || b._bpTimer <= 1) {
+              blueprintTick = true
+              b._bpTimer = 10
+              popups.push({ resource: 'blueprints', amount: 1, buildingId: b.id })
+            } else {
+              b._bpTimer -= 1
+            }
+          }
         }
       })
+      if (blueprintTick) {
+        newResources.blueprints = (newResources.blueprints || 0) + 1
+      }
+
+      // Population = base 3 villagers + 2 per active building
+      const activeCount = newBuildings.filter((b) => b.status === 'active').length
+      const population = 3 + activeCount * 2
 
       // Trade boost timer
       let tradeBoostActive = s.tradeBoostActive
@@ -164,6 +189,7 @@ const useStore = create((set, get) => ({
         tradeBoostActive,
         tradeBoostTimer,
         resourcePopups: popups,
+        population,
       }
     })
   },
@@ -180,6 +206,24 @@ const useStore = create((set, get) => ({
         ],
       }))
     }
+  },
+
+  // Upgrade a building (costs blueprints, increases level)
+  upgradeBuilding: (buildingId) => {
+    const state = get()
+    const building = state.buildings.find((b) => b.id === buildingId)
+    if (!building || building.status !== 'active') return false
+    const cost = building.level * 3 // 3, 6, 9... blueprints per level
+    if (state.resources.blueprints < cost) return false
+
+    set((s) => ({
+      buildings: s.buildings.map((b) =>
+        b.id === buildingId ? { ...b, level: b.level + 1 } : b
+      ),
+      resources: { ...s.resources, blueprints: s.resources.blueprints - cost },
+    }))
+    playUpgrade()
+    return true
   },
 
   // UI actions

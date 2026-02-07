@@ -7,10 +7,14 @@ export default function BuildingInfo() {
   const buildings = useStore((s) => s.buildings)
   const closeInfo = useStore((s) => s.closeInfo)
   const activateTradeBoost = useStore((s) => s.activateTradeBoost)
+  const upgradeBuilding = useStore((s) => s.upgradeBuilding)
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
+  const blueprints = useStore((s) => s.resources.blueprints)
 
   const building = buildings.find((b) => b.id === selectedBuildingId)
   const def = building ? BUILDINGS[building.type] : null
+  const upgradeCost = building ? building.level * 3 : 0
+  const canUpgrade = blueprints >= upgradeCost && building?.status === 'active'
 
   return (
     <AnimatePresence>
@@ -56,12 +60,29 @@ export default function BuildingInfo() {
                 <span className="text-zinc-500">Produces</span>
                 <span>
                   {Object.entries(def.produces)
-                    .map(([r, a]) => `${a} ${r}/s`)
+                    .map(([r, a]) => `${a * (building.level || 1)} ${r}/s`)
                     .join(', ')}
+                  {building.level > 1 && (
+                    <span className="text-blue-400 ml-1">(Lv.{building.level})</span>
+                  )}
                 </span>
               </div>
             )}
           </div>
+
+          {building.status === 'active' && (
+            <button
+              onClick={() => upgradeBuilding(building.id)}
+              disabled={!canUpgrade}
+              className={`mt-3 w-full py-2 rounded-lg font-semibold text-sm transition-colors ${
+                canUpgrade
+                  ? 'bg-blue-700 hover:bg-blue-600 text-white cursor-pointer'
+                  : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
+              }`}
+            >
+              Upgrade to Lv.{building.level + 1} (📜 {upgradeCost} blueprints)
+            </button>
+          )}
 
           {def.special === 'trade_boost' && building.status === 'active' && (
             <button

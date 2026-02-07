@@ -17,11 +17,11 @@ function ResourceDisplay({ label, value, icon, glowClass, prevValue }) {
   }, [value, prevValue])
 
   return (
-    <div className="flex items-center gap-2 relative">
-      <span className="text-lg">{icon}</span>
+    <div className="flex items-center gap-1 sm:gap-2 relative">
+      <span className="text-sm sm:text-lg">{icon}</span>
       <div className="flex flex-col">
-        <span className="text-xs text-zinc-400 uppercase tracking-wider">{label}</span>
-        <span className={`text-lg font-bold ${glowClass}`}>{Math.floor(value)}</span>
+        <span className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider hidden sm:block">{label}</span>
+        <span className={`text-sm sm:text-lg font-bold ${glowClass}`}>{Math.floor(value)}</span>
       </div>
       <AnimatePresence>
         {diff && (
@@ -43,6 +43,7 @@ function ResourceDisplay({ label, value, icon, glowClass, prevValue }) {
 export default function TopBar() {
   const resources = useStore((s) => s.resources)
   const buildings = useStore((s) => s.buildings)
+  const population = useStore((s) => s.population)
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
   const tradeBoostTimer = useStore((s) => s.tradeBoostTimer)
   const [prev, setPrev] = useState(resources)
@@ -90,10 +91,21 @@ export default function TopBar() {
           icon="💎"
           glowClass="resource-glow-crystals text-purple-400"
         />
+        {resources.blueprints > 0 && (
+          <ResourceDisplay
+            label="Blueprints"
+            value={resources.blueprints}
+            prevValue={prev.blueprints || 0}
+            icon="📜"
+            glowClass="text-blue-400"
+          />
+        )}
       </div>
 
       <div className="flex items-center gap-3 text-sm text-zinc-400">
-        <span>{activeBuildings} buildings</span>
+        <span>👥 {population}</span>
+        <span className="hidden sm:inline">·</span>
+        <span className="hidden sm:inline">{activeBuildings} buildings</span>
         {tradeBoostActive && (
           <motion.span
             initial={{ scale: 0 }}
