@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --color-brass: #b5891c;
+  --color-copper: #b87333;
+  --color-steam: #d4d4d8;
+  --color-crystal: #a855f7;
+  --color-dark-bg: #1a1a2e;
+  --color-panel: #16213e;
+  --color-panel-border: #0f3460;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--color-dark-bg);
+  color: #e4e4e7;
+  width: 100vw;
+  height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.font-medieval {
+  font-family: 'MedievalSharp', cursive;
+}
+
+.panel {
+  background: rgba(22, 33, 62, 0.92);
+  border: 1px solid var(--color-panel-border);
+  backdrop-filter: blur(8px);
+}
+
+.resource-glow-gears {
+  text-shadow: 0 0 8px rgba(181, 137, 28, 0.6);
+}
+
+.resource-glow-steam {
+  text-shadow: 0 0 8px rgba(212, 212, 216, 0.6);
+}
+
+.resource-glow-crystals {
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+}
+
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-40px); }
+}
+
+.animate-float-up {
+  animation: float-up 1s ease-out forwards;
+}
