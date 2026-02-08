@@ -80,6 +80,22 @@ export const MOOD_CHRONICLE_TEMPLATES = {
     "A strange wind blows through the settlement... {event}!",
     "The chronicler hastily scribbles: an unexpected turn — {event}!",
   ],
+  mood_worsen: [
+    "{villager}'s mood darkens from {oldMood} to {newMood}. Harsh words have consequences.",
+    "The chronicler winces — {villager} grows {newMood} after a regrettable exchange. Diplomacy has failed.",
+  ],
+  bribe: [
+    "{villager} pockets a generous bribe of {cost} gears. Their mood brightens considerably to {newMood}.",
+    "Coin speaks louder than words — {villager} is swayed by {cost} gears. Now {newMood} and cooperative.",
+  ],
+  rest_start: [
+    "{villager} has been sent to rest. They'll be unavailable for a while, but will return refreshed.",
+    "The chronicler notes: {villager} retires to their quarters for much-needed rest. The village must manage without them.",
+  ],
+  rest_complete: [
+    "{villager} returns from rest, looking refreshed and happy! Ready for duty once more.",
+    "Well-rested and bright-eyed, {villager} emerges ready to work. Sometimes rest is the best medicine.",
+  ],
 }
 
 export function getRandomChronicle(key) {

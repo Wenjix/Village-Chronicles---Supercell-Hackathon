@@ -32,7 +32,7 @@ const useStore = create((set, get) => ({
       mood: 'happy', personality: 'diligent', moodTimer: 30,
       assignedBuildingId: null, feudTarget: null,
       targetX: null, targetY: null, walkProgress: 0,
-      negotiationCount: 0,
+      negotiationCount: 0, restTimer: 0,
     },
     {
       id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
@@ -40,7 +40,7 @@ const useStore = create((set, get) => ({
       mood: 'happy', personality: 'cheerful', moodTimer: 25,
       assignedBuildingId: null, feudTarget: null,
       targetX: null, targetY: null, walkProgress: 0,
-      negotiationCount: 0,
+      negotiationCount: 0, restTimer: 0,
     },
     {
       id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
@@ -48,7 +48,7 @@ const useStore = create((set, get) => ({
       mood: 'happy', personality: 'hothead', moodTimer: 20,
       assignedBuildingId: null, feudTarget: null,
       targetX: null, targetY: null, walkProgress: 0,
-      negotiationCount: 0,
+      negotiationCount: 0, restTimer: 0,
     },
   ],
 
@@ -125,6 +125,7 @@ const useStore = create((set, get) => ({
     if (!building || building.status !== 'proposed') return { success: false, reason: 'not_proposed' }
     if (!villager) return { success: false, reason: 'no_villager' }
     if (villager.assignedBuildingId) return { success: false, reason: 'already_busy' }
+    if (villager.restTimer > 0) return { success: false, reason: 'resting' }
 
     // Check for refusal (mercy rule: auto-succeed after 3 negotiations)
     if (villager.negotiationCount < 3 && rollRefusal(villager.mood)) {
@@ -237,6 +238,112 @@ const useStore = create((set, get) => ({
     return improved
   },
 
+  // Worsen a villager's mood (consequence of rude/hostile dialogue)
+  worsenVillagerMood: (villagerId) => {
+    const state = get()
+    const villager = state.villagers.find((v) => v.id === villagerId)
+    if (!villager) return false
+
+    const moodDecline = { happy: 'tired', tired: 'grumpy', grumpy: 'feuding', lazy: 'grumpy', feuding: 'feuding' }
+    const newMood = moodDecline[villager.mood] || villager.mood
+    const worsened = newMood !== villager.mood
+
+    // If entering feuding, pick a random feud target
+    let feudTarget = villager.feudTarget
+    if (newMood === 'feuding' && !feudTarget && state.villagers.length > 1) {
+      const others = state.villagers.filter((o) => o.id !== villagerId)
+      feudTarget = others[Math.floor(Math.random() * others.length)].id
+    }
+
+    set((s) => ({
+      villagers: s.villagers.map((v) =>
+        v.id === villagerId
+          ? { ...v, mood: newMood, moodTimer: 30, feudTarget }
+          : v
+      ),
+    }))
+
+    if (worsened) {
+      playRefusal()
+      const chronicle = getMoodChronicle('mood_worsen', {
+        villager: villager.name,
+        oldMood: villager.mood,
+        newMood,
+      })
+      if (chronicle) {
+        set((s) => ({
+          events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }],
+        }))
+      }
+    }
+
+    return worsened
+  },
+
+  // Bribe a villager — costs gears, improves mood by 2 steps
+  bribeVillager: (villagerId) => {
+    const state = get()
+    const villager = state.villagers.find((v) => v.id === villagerId)
+    if (!villager) return { success: false, reason: 'no_villager' }
+
+    const bribeCost = 25
+    if (state.resources.gears < bribeCost) return { success: false, reason: 'no_funds' }
+
+    // Two-step mood improvement
+    const moodImprovement = { grumpy: 'tired', tired: 'happy', lazy: 'happy', feuding: 'tired', happy: 'happy' }
+    const step1 = moodImprovement[villager.mood] || 'happy'
+    const newMood = moodImprovement[step1] || step1
+
+    set((s) => ({
+      resources: { ...s.resources, gears: s.resources.gears - bribeCost },
+      villagers: s.villagers.map((v) =>
+        v.id === villagerId
+          ? { ...v, mood: newMood, moodTimer: 40, feudTarget: newMood !== 'feuding' ? null : v.feudTarget }
+          : v
+      ),
+    }))
+
+    playNegotiateSuccess()
+    const chronicle = getMoodChronicle('bribe', {
+      villager: villager.name,
+      cost: bribeCost,
+      newMood,
+    })
+    if (chronicle) {
+      set((s) => ({
+        events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }],
+      }))
+    }
+
+    return { success: true, cost: bribeCost, newMood }
+  },
+
+  // Send a villager to rest — unavailable for a cooldown period, but fully restores mood
+  restVillager: (villagerId) => {
+    const state = get()
+    const villager = state.villagers.find((v) => v.id === villagerId)
+    if (!villager) return false
+    if (villager.assignedBuildingId) return false
+    if (villager.restTimer > 0) return false
+
+    set((s) => ({
+      villagers: s.villagers.map((v) =>
+        v.id === villagerId
+          ? { ...v, restTimer: 15, mood: 'tired', moodTimer: 50 }
+          : v
+      ),
+    }))
+
+    const chronicle = getMoodChronicle('rest_start', { villager: villager.name })
+    if (chronicle) {
+      set((s) => ({
+        events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }],
+      }))
+    }
+
+    return true
+  },
+
   // Game tick — called every second
   tick: () => {
     set((s) => {
@@ -248,9 +355,24 @@ const useStore = create((set, get) => ({
       const newVillagers = s.villagers.map((v) => {
         let updated = { ...v }
 
+        // Rest timer countdown
+        if (updated.restTimer > 0) {
+          updated.restTimer -= 1
+          if (updated.restTimer <= 0) {
+            updated.restTimer = 0
+            updated.mood = 'happy'
+            updated.moodTimer = 40
+            updated.feudTarget = null
+            const chronicle = getMoodChronicle('rest_complete', { villager: updated.name })
+            if (chronicle) {
+              newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+            }
+          }
+        }
+
         // Mood timer countdown
         updated.moodTimer -= 1
-        if (updated.moodTimer <= 0) {
+        if (updated.moodTimer <= 0 && updated.restTimer <= 0) {
           const newMood = rollMoodShift(updated.personality)
           // If rolling feuding, pick a random feud target
           if (newMood === 'feuding' && s.villagers.length > 1) {
