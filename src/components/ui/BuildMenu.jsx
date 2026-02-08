@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { BUILDINGS, BUILDING_TYPES, canAfford } from '../../data/buildings'
@@ -7,29 +8,64 @@ const BUILDING_LIST = Object.entries(BUILDINGS).map(([key, val]) => ({
   ...val,
 }))
 
-const RESOURCE_COLORS = {
-  gears: 'bg-amber-900/40 text-amber-400 border-amber-700/40',
-  steam: 'bg-zinc-800/40 text-zinc-300 border-zinc-600/40',
-  crystals: 'bg-purple-900/40 text-purple-400 border-purple-700/40',
+const RESOURCE_STYLES = {
+  wood: { icon: '🪵', classes: 'bg-amber-900/40 text-amber-600 border-amber-800/40' },
+  stone: { icon: '🪨', classes: 'bg-stone-800/40 text-stone-400 border-stone-700/40' },
+  metal: { icon: '🔩', classes: 'bg-slate-800/40 text-slate-300 border-slate-600/40' },
+  water: { icon: '💧', classes: 'bg-cyan-900/40 text-cyan-400 border-cyan-700/40' },
+  gears: { icon: '⚙️', classes: 'bg-amber-900/40 text-amber-400 border-amber-700/40' },
+  steam: { icon: '💨', classes: 'bg-zinc-800/40 text-zinc-300 border-zinc-600/40' },
+  crystals: { icon: '💎', classes: 'bg-purple-900/40 text-purple-400 border-purple-700/40' },
+  blueprints: { icon: '📜', classes: 'bg-blue-900/40 text-blue-400 border-blue-700/40' },
 }
 
 function CostDisplay({ cost }) {
-  const parts = []
-  if (cost.gears) parts.push({ label: `⚙️ ${cost.gears}`, resource: 'gears' })
-  if (cost.steam) parts.push({ label: `💨 ${cost.steam}`, resource: 'steam' })
-  if (cost.crystals) parts.push({ label: `💎 ${cost.crystals}`, resource: 'crystals' })
+  const parts = Object.entries(cost)
+    .filter(([, amount]) => amount > 0)
+    .map(([resource, amount]) => ({
+      resource,
+      label: `${RESOURCE_STYLES[resource]?.icon || ''} ${amount}`,
+    }))
   if (parts.length === 0) return <span className="text-green-400 text-sm">Free</span>
   return (
-    <div className="flex gap-1">
+    <div className="flex flex-wrap gap-1 justify-end">
       {parts.map((p) => (
         <span
           key={p.resource}
-          className={`text-[11px] px-1.5 py-0.5 rounded border ${RESOURCE_COLORS[p.resource]}`}
+          className={`text-[11px] px-1.5 py-0.5 rounded border ${RESOURCE_STYLES[p.resource]?.classes || ''}`}
         >
           {p.label}
         </span>
       ))}
     </div>
+  )
+}
+
+function DeficitDisplay({ cost, resources }) {
+  const deficit = Object.entries(cost)
+    .filter(([resource, amount]) => (resources[resource] || 0) < amount)
+    .map(([resource, amount]) => ({
+      resource,
+      need: amount - (resources[resource] || 0),
+    }))
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      className="flex flex-wrap gap-1 mt-1"
+    >
+      <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Requires:</span>
+      {deficit.map((d) => (
+        <span
+          key={d.resource}
+          className="text-[11px] px-1.5 py-0.5 rounded border border-red-800/60 bg-red-950/40 text-red-300 font-bold"
+        >
+          {RESOURCE_STYLES[d.resource]?.icon || ''} {d.need} more {d.resource}
+        </span>
+      ))}
+    </motion.div>
   )
 }
 
@@ -39,6 +75,7 @@ export default function BuildMenu() {
   const resources = useStore((s) => s.resources)
   const placeBuilding = useStore((s) => s.placeBuilding)
   const closeBuildMenu = useStore((s) => s.closeBuildMenu)
+  const [deficitType, setDeficitType] = useState(null)
 
   return (
     <AnimatePresence>
@@ -66,48 +103,73 @@ export default function BuildMenu() {
           <div className="flex flex-col gap-3">
             {BUILDING_LIST.map((b) => {
               const affordable = canAfford(resources, b.type)
+              const showDeficit = deficitType === b.type
               return (
-                <motion.button
-                  key={b.type}
-                  whileHover={{ x: affordable ? 5 : 0 }}
-                  disabled={!affordable}
-                  onClick={() => placeBuilding(b.type, selectedCell.x, selectedCell.y)}
-                  className={`group flex items-center justify-between p-4 border transition-all cursor-pointer relative overflow-hidden ${
-                    affordable
-                      ? 'border-brass-dim/20 bg-black/20 hover:bg-black/40 hover:border-amber-500'
-                      : 'border-zinc-800 opacity-40 cursor-not-allowed grayscale'
-                  }`}
-                >
-                  <div className="flex items-center gap-4 relative z-10">
-                    {/* Icon/Color square */}
-                    <div
-                      className="w-10 h-10 rounded border border-white/5 flex items-center justify-center text-xl shadow-inner bg-black/40"
-                      style={{ color: b.color }}
-                    >
-                      {b.type === 'clockwork_forge' ? '⚒️' : 
-                       b.type === 'steam_mill' ? '💨' :
-                       b.type === 'crystal_refinery' ? '💎' :
-                       b.type === 'airship_dock' ? '⚓' : '⚙️'}
-                    </div>
-                    
-                    <div className="flex flex-col items-start">
-                      <span className="font-medieval text-sm text-amber-100 group-hover:text-amber-400 transition-colors">{b.name}</span>
-                      <span className="text-[10px] text-zinc-500 italic max-w-[180px] line-clamp-1">{b.description}</span>
-                    </div>
-                  </div>
+                <div key={b.type}>
+                  <motion.button
+                    whileHover={{ x: affordable ? 5 : 0 }}
+                    onClick={() => {
+                      if (affordable) {
+                        placeBuilding(b.type, selectedCell.x, selectedCell.y)
+                        setDeficitType(null)
+                      } else {
+                        setDeficitType(showDeficit ? null : b.type)
+                      }
+                    }}
+                    className={`group w-full flex items-center justify-between p-4 border transition-all cursor-pointer relative overflow-hidden ${
+                      affordable
+                        ? 'border-brass-dim/20 bg-black/20 hover:bg-black/40 hover:border-amber-500'
+                        : 'border-zinc-800/60 bg-black/10 hover:border-red-900/50 hover:bg-red-950/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-4 relative z-10">
+                      {/* Icon/Color square */}
+                      <div
+                        className={`w-10 h-10 rounded border border-white/5 flex items-center justify-center text-xl shadow-inner bg-black/40 ${!affordable ? 'grayscale opacity-50' : ''}`}
+                        style={{ color: b.color }}
+                      >
+                        {b.type === 'clockwork_forge' ? '⚒️' :
+                         b.type === 'steam_mill' ? '💨' :
+                         b.type === 'crystal_refinery' ? '💎' :
+                         b.type === 'airship_dock' ? '⚓' :
+                         b.type === 'explorers_guild' ? '🧭' :
+                         b.type === 'cottage' ? '🏠' :
+                         b.type === 'tesla_tower' ? '⚡' :
+                         b.type === 'watchtower' ? '🔭' : '⚙️'}
+                      </div>
 
-                  <div className="flex flex-col items-end gap-2 relative z-10">
-                    <CostDisplay cost={b.cost} />
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">
-                      CONSTRUCTION: {b.buildTime}s
-                    </span>
-                  </div>
-                  
-                  {/* Hover glow */}
-                  {affordable && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  )}
-                </motion.button>
+                      <div className="flex flex-col items-start">
+                        <span className={`font-medieval text-sm transition-colors ${affordable ? 'text-amber-100 group-hover:text-amber-400' : 'text-zinc-400'}`}>{b.name}</span>
+                        <span className="text-[10px] text-zinc-500 italic max-w-[180px] line-clamp-1">{b.description}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2 relative z-10">
+                      <CostDisplay cost={b.cost} />
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">
+                        CONSTRUCTION: {b.buildTime}s
+                      </span>
+                    </div>
+
+                    {/* Hover glow */}
+                    {affordable && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </motion.button>
+                  <AnimatePresence>
+                    {showDeficit && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden border-x border-b border-red-900/40 bg-red-950/20 px-4 py-2"
+                      >
+                        <DeficitDisplay cost={b.cost} resources={resources} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               )
             })}
           </div>
