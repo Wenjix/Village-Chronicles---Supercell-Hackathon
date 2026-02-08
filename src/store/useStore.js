@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { BUILDINGS, canAfford } from '../data/buildings'
 import { getRandomChronicle, getMoodChronicle } from '../data/chronicles'
 import { PLOT_SIZE, createEmptyGrid, isValidCell } from '../utils/gridUtils'
@@ -26,9 +27,84 @@ const CHARACTER_MODEL_PATHS = [
 const pickCharacterModel = () =>
   CHARACTER_MODEL_PATHS[Math.floor(Math.random() * CHARACTER_MODEL_PATHS.length)]
 
-const useStore = create((set, get) => ({
+// Default initial state (used for new games and reset)
+const INITIAL_VILLAGERS = [
+  {
+    id: 1, name: 'Barnaby Cogsworth', role: 'Engineer', x: 2, y: 2,
+    homeX: 2, homeY: 2,
+    mood: 'happy', personality: 'diligent', moodTimer: 30,
+    modelUrl: '/src/models/characters/male/character-male-a.glb',
+    assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
+    targetX: null, targetY: null, walkProgress: 0,
+    negotiationCount: 0, restTimer: 0,
+    health: 100, maxHealth: 100, isMilitia: false,
+  },
+  {
+    id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
+    homeX: 5, homeY: 3,
+    mood: 'happy', personality: 'cheerful', moodTimer: 25,
+    modelUrl: '/src/models/characters/female/character-female-b.glb',
+    assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
+    targetX: null, targetY: null, walkProgress: 0,
+    negotiationCount: 0, restTimer: 0,
+    health: 100, maxHealth: 100, isMilitia: false,
+  },
+  {
+    id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
+    homeX: 4, homeY: 6,
+    mood: 'happy', personality: 'hothead', moodTimer: 20,
+    modelUrl: '/src/models/characters/male/character-male-b.glb',
+    assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
+    targetX: null, targetY: null, walkProgress: 0,
+    negotiationCount: 0, restTimer: 0,
+    health: 100, maxHealth: 100, isMilitia: false,
+  },
+]
+
+const INITIAL_STATE = {
+  resources: { wood: 0, stone: 0, metal: 0, water: 0, gears: 0, steam: 0, crystals: 0, blueprints: 0 },
+  population: 3,
+  maxPopulation: 3,
+  wandererTimer: 60,
+  pendingWanderer: null,
+  buildings: [],
+  nodes: [],
+  enemies: [],
+  gameTick: 0,
+  unlockedPlots: [{ x: 0, y: 0 }],
+  grid: createEmptyGrid(),
+  events: [],
+  villagers: INITIAL_VILLAGERS,
+  gameOver: false,
+  activeRandomEvent: null,
+  randomEventTimer: 0,
+  villageHappiness: 100,
+  tradeBoostActive: false,
+  tradeBoostTimer: 0,
+}
+
+// Restore ID counters from saved state so new items don't collide
+function restoreIdCounters(state) {
+  const maxBId = state.buildings.reduce((m, b) => Math.max(m, b.id || 0), 0)
+  const maxEId = state.events.reduce((m, e) => Math.max(m, e.id || 0), 0)
+  const maxNId = state.nodes.reduce((m, n) => Math.max(m, n.id || 0), 0)
+  nextBuildingId = maxBId + 1
+  nextEventId = maxEId + 1
+  nextNodeId = maxNId + 1
+}
+
+const useStore = create(persist((set, get) => ({
   // Resources
   resources: { wood: 0, stone: 0, metal: 0, water: 0, gears: 0, steam: 0, crystals: 0, blueprints: 0 },
+
+  // Whether persist hydration has completed
+  _hasHydrated: false,
+  // Whether a save was loaded (set by onRehydrateStorage)
+  _saveLoaded: false,
+  // Whether the player has chosen to resume or start fresh
+  _gameStarted: false,
+  // Incremented on resume/new game to force 3D component remounts
+  _sessionId: 0,
 
   // Population and Housing
   population: 3,
@@ -56,38 +132,7 @@ const useStore = create((set, get) => ({
   events: [],
 
   // NPC villagers
-  villagers: [
-    {
-      id: 1, name: 'Barnaby Cogsworth', role: 'Engineer', x: 2, y: 2,
-      homeX: 2, homeY: 2,
-      mood: 'happy', personality: 'diligent', moodTimer: 30,
-      modelUrl: '/src/models/characters/male/character-male-a.glb',
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
-      targetX: null, targetY: null, walkProgress: 0,
-      negotiationCount: 0, restTimer: 0,
-      health: 100, maxHealth: 100, isMilitia: false,
-    },
-    {
-      id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
-      homeX: 5, homeY: 3,
-      mood: 'happy', personality: 'cheerful', moodTimer: 25,
-      modelUrl: '/src/models/characters/female/character-female-b.glb',
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
-      targetX: null, targetY: null, walkProgress: 0,
-      negotiationCount: 0, restTimer: 0,
-      health: 100, maxHealth: 100, isMilitia: false,
-    },
-    {
-      id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
-      homeX: 4, homeY: 6,
-      mood: 'happy', personality: 'hothead', moodTimer: 20,
-      modelUrl: '/src/models/characters/male/character-male-b.glb',
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
-      targetX: null, targetY: null, walkProgress: 0,
-      negotiationCount: 0, restTimer: 0,
-      health: 100, maxHealth: 100, isMilitia: false,
-    },
-  ],
+  villagers: INITIAL_VILLAGERS.map(v => ({ ...v })),
 
   // Game over
   gameOver: false,
@@ -404,6 +449,7 @@ const useStore = create((set, get) => ({
     if (villager.assignedBuildingId || villager.assignedNodeId) {
       get().unassignVillager(villagerId)
     }
+
     // Check for refusal
     if (villager.negotiationCount < 3 && rollRefusal(villager.mood)) {
       playRefusal()
@@ -419,7 +465,6 @@ const useStore = create((set, get) => ({
       }
       return { success: false, reason: 'refused', mood: villager.mood }
     }
-
 
     // Pick adjacent cell
     const adjacentOffsets = [
@@ -766,6 +811,14 @@ const useStore = create((set, get) => ({
               ]
             }
 
+            // Special wonder completion chronicle
+            if (def?.special === 'wonder') {
+              newEvents = [
+                ...newEvents,
+                { id: nextEventId++, text: 'THE AETHER CONDUIT IS COMPLETE! A pillar of light erupts skyward as raw aether flows through the village. Every workshop hums, every forge blazes — the village has achieved its ultimate glory!', timestamp: Date.now(), buildingType: b.type },
+              ]
+            }
+
             if (worker) {
               worker.assignedBuildingId = null
               worker.targetX = worker.homeX
@@ -785,12 +838,29 @@ const useStore = create((set, get) => ({
       const eventMultiplier = s.activeRandomEvent ? (RANDOM_EVENTS[s.activeRandomEvent]?.multiplier || 1) : 1
       const multiplier = (s.tradeBoostActive ? 2 : 1) * eventMultiplier
       let blueprintTick = false
+
+      // Production aura: find active Grand Clocktowers and the plots they're on
+      const auraPlots = new Set()
+      newBuildings.forEach((b) => {
+        if (b.status === 'active' && BUILDINGS[b.type].special === 'production_aura') {
+          const plotX = Math.floor(b.gridX / PLOT_SIZE)
+          const plotY = Math.floor(b.gridY / PLOT_SIZE)
+          auraPlots.add(`${plotX},${plotY}`)
+        }
+      })
+
       newBuildings.forEach((b) => {
         if (b.status === 'active') {
           const def = BUILDINGS[b.type]
+
+          // Check if this building benefits from a clocktower aura
+          const bPlotX = Math.floor(b.gridX / PLOT_SIZE)
+          const bPlotY = Math.floor(b.gridY / PLOT_SIZE)
+          const auraMultiplier = auraPlots.has(`${bPlotX},${bPlotY}`) ? 1.5 : 1
+
           if (def.produces && Object.keys(def.produces).length > 0) {
             Object.entries(def.produces).forEach(([resource, amount]) => {
-              const gain = amount * multiplier * (b.level || 1)
+              const gain = amount * multiplier * auraMultiplier * (b.level || 1)
               newResources[resource] = (newResources[resource] || 0) + gain
               popups.push({ resource, amount: gain, buildingId: b.id })
             })
@@ -799,6 +869,16 @@ const useStore = create((set, get) => ({
             if (!b._bpTimer || b._bpTimer <= 1) {
               blueprintTick = true
               b._bpTimer = 10
+              popups.push({ resource: 'blueprints', amount: 1, buildingId: b.id })
+            } else {
+              b._bpTimer -= 1
+            }
+          }
+          // Wonder blueprint production (1 every 5 ticks)
+          if (def.special === 'wonder') {
+            if (!b._bpTimer || b._bpTimer <= 1) {
+              newResources.blueprints = (newResources.blueprints || 0) + 1
+              b._bpTimer = 5
               popups.push({ resource: 'blueprints', amount: 1, buildingId: b.id })
             } else {
               b._bpTimer -= 1
@@ -838,14 +918,17 @@ const useStore = create((set, get) => ({
       let newEnemies = [...s.enemies]
 
       // Random enemy spawns that scale with game progression
-      // Base chance starts at 0.5% per tick, increases over time
       const progressionMinutes = gameTick / 60
       const spawnChance = Math.min(0.05, 0.005 + progressionMinutes * 0.002)
-      // Spawn more enemies at once as game progresses
       const maxSpawnCount = 1 + Math.floor(progressionMinutes / 5)
 
-      // Cap active enemies based on villager count — at most villagerCount + 1
-      const maxActiveEnemies = newVillagers.length + 1
+      // Cap active enemies based on player progression:
+      // - No cottage yet: max 2 raiders
+      // - Has cottage but only 1 plot: max 4 raiders
+      // - Multiple plots: scales with villager count
+      const hasHousing = newBuildings.some(b => b.status === 'active' && BUILDINGS[b.type]?.special === 'housing')
+      const hasMultiplePlots = s.unlockedPlots.length > 1
+      const maxActiveEnemies = !hasHousing ? 2 : !hasMultiplePlots ? 4 : newVillagers.length + 1
       if (Math.random() < spawnChance && newEnemies.length < maxActiveEnemies) {
         const spawnBudget = maxActiveEnemies - newEnemies.length
         const spawnCount = Math.min(1 + Math.floor(Math.random() * maxSpawnCount), spawnBudget)
@@ -857,12 +940,37 @@ const useStore = create((set, get) => ({
           const distPlot = s.unlockedPlots[Math.floor(Math.random()*s.unlockedPlots.length)]
           const ex = distPlot.x * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
           const ey = distPlot.y * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
-          const enemyHealth = 50 + Math.floor(progressionMinutes * 5)
+          // Early raiders are weaker so initial militia skirmishes are less punishing.
+          // By ~3 minutes, this ramps back to the previous baseline (~50 HP).
+          const enemyHealth = 35 + Math.floor(progressionMinutes * 5)
           newEnemies.push({
             id: Date.now() + i, x: ex, y: ey, targetX: 4, targetY: 4, health: enemyHealth, maxHealth: enemyHealth, type: 'raider', speed: 0.05
           })
         }
       }
+
+      // --- Enemy AI: each enemy picks the nearest target (building or villager) ---
+      const attackableBuildings = newBuildings.filter(b => b.status === 'active' || b.status === 'building')
+      newEnemies.forEach(e => {
+        // Find nearest building
+        let bestTarget = null
+        let bestDist = Infinity
+        attackableBuildings.forEach(b => {
+          const bd = Math.sqrt(Math.pow(e.x - b.gridX, 2) + Math.pow(e.y - b.gridY, 2))
+          if (bd < bestDist) { bestDist = bd; bestTarget = { x: b.gridX, y: b.gridY } }
+        })
+        // Find nearest villager — prefer over buildings if closer
+        newVillagers.forEach(v => {
+          const vx = v.targetX !== null && v.walkProgress >= 1 ? v.targetX : v.x
+          const vy = v.targetY !== null && v.walkProgress >= 1 ? v.targetY : v.y
+          const vd = Math.sqrt(Math.pow(e.x - vx, 2) + Math.pow(e.y - vy, 2))
+          if (vd < bestDist) { bestDist = vd; bestTarget = { x: vx, y: vy } }
+        })
+        if (bestTarget) {
+          e.targetX = bestTarget.x
+          e.targetY = bestTarget.y
+        }
+      })
 
       // Watchtower slow: enemies in range of a watchtower move at half speed
       const watchtowers = activeBuildings.filter(b => BUILDINGS[b.type].special === 'vision')
@@ -872,7 +980,6 @@ const useStore = create((set, get) => ({
         const dist = Math.sqrt(dx*dx + dy*dy)
         if (dist > 0.2) {
           let speed = e.speed
-          // Check watchtower slow
           for (const wt of watchtowers) {
             const wtDist = Math.sqrt(Math.pow(e.x - wt.gridX, 2) + Math.pow(e.y - wt.gridY, 2))
             if (wtDist <= (BUILDINGS[wt.type].range || 6)) {
@@ -901,67 +1008,50 @@ const useStore = create((set, get) => ({
         })
       })
 
-      // Enemies attack nearest building when they arrive (dist <= 0.2 to target)
+      // Enemies attack buildings within melee range
       newEnemies.forEach(e => {
-        const dx = e.targetX - e.x, dy = e.targetY - e.y
-        const distToTarget = Math.sqrt(dx*dx + dy*dy)
-        if (distToTarget <= 0.2) {
-          // Find nearest active building within 1.5 range
-          let closestBldg = null
-          let closestDist = Infinity
-          newBuildings.forEach(b => {
-            if (b.status !== 'active' && b.status !== 'building') return
-            const bd = Math.sqrt(Math.pow(e.x - b.gridX, 2) + Math.pow(e.y - b.gridY, 2))
-            if (bd < closestDist && bd <= 1.5) {
-              closestDist = bd
-              closestBldg = b
-            }
-          })
-          if (closestBldg) {
-            closestBldg.health -= 5
-            if (closestBldg.health <= 0) {
-              closestBldg.health = 0
-              closestBldg.status = 'destroyed'
-              const def = BUILDINGS[closestBldg.type]
-              const chronicle = `Devastation! The ${def?.name || closestBldg.type} has been reduced to rubble by raiders!`
-              newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
-              // Free the grid cell
-              const key = `${closestBldg.gridX},${closestBldg.gridY}`
-              delete newGrid[key]
-              // Unassign worker
-              if (closestBldg.assignedVillager) {
-                const worker = newVillagers.find(v => v.id === closestBldg.assignedVillager)
-                if (worker) {
-                  worker.assignedBuildingId = null
-                  worker.targetX = worker.homeX
-                  worker.targetY = worker.homeY
-                  worker.walkProgress = 0
-                }
-              }
-              // Retarget enemy to next nearest building
-              let nextBldg = null
-              let nextDist = Infinity
-              newBuildings.forEach(b => {
-                if (b.id === closestBldg.id || (b.status !== 'active' && b.status !== 'building')) return
-                const bd = Math.sqrt(Math.pow(e.x - b.gridX, 2) + Math.pow(e.y - b.gridY, 2))
-                if (bd < nextDist) { nextDist = bd; nextBldg = b }
-              })
-              if (nextBldg) {
-                e.targetX = nextBldg.gridX
-                e.targetY = nextBldg.gridY
+        let closestBldg = null
+        let closestDist = Infinity
+        newBuildings.forEach(b => {
+          if (b.status !== 'active' && b.status !== 'building') return
+          const bd = Math.sqrt(Math.pow(e.x - b.gridX, 2) + Math.pow(e.y - b.gridY, 2))
+          if (bd < closestDist && bd <= 1.5) {
+            closestDist = bd
+            closestBldg = b
+          }
+        })
+        if (closestBldg) {
+          closestBldg.health -= 5
+          if (closestBldg.health <= 0) {
+            closestBldg.health = 0
+            closestBldg.status = 'destroyed'
+            const def = BUILDINGS[closestBldg.type]
+            const chronicle = `Devastation! The ${def?.name || closestBldg.type} has been reduced to rubble by raiders!`
+            newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+            const key = `${closestBldg.gridX},${closestBldg.gridY}`
+            delete newGrid[key]
+            if (closestBldg.assignedVillager) {
+              const worker = newVillagers.find(v => v.id === closestBldg.assignedVillager)
+              if (worker) {
+                worker.assignedBuildingId = null
+                worker.targetX = worker.homeX
+                worker.targetY = worker.homeY
+                worker.walkProgress = 0
               }
             }
           }
         }
       })
 
-      // Enemies fight back: damage ANY villager within 1.5 range
+      // Enemies attack villagers within melee range
       newEnemies.forEach(e => {
         newVillagers.forEach(v => {
-          const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
+          const vx = v.targetX !== null && v.walkProgress >= 1 ? v.targetX : v.x
+          const vy = v.targetY !== null && v.walkProgress >= 1 ? v.targetY : v.y
+          const dist = Math.sqrt(Math.pow(e.x - vx, 2) + Math.pow(e.y - vy, 2))
           if (dist <= 1.5) {
-            v.health -= 1
-            // Non-militia flee
+            v.health -= 2
+            // Non-militia flee when hit
             if (!v.isMilitia && !v.assignedBuildingId && !v.assignedNodeId) {
               v.targetX = v.homeX
               v.targetY = v.homeY
@@ -1299,8 +1389,8 @@ const useStore = create((set, get) => ({
       x: px * PLOT_SIZE,
       y: py * PLOT_SIZE,
       targetX: 4, targetY: 4, // Target village center
-      health: 50,
-      maxHealth: 50,
+      health: 35,
+      maxHealth: 35,
       type: 'raider',
       speed: 0.05
     }
@@ -1350,6 +1440,89 @@ const useStore = create((set, get) => ({
   closeInfo: () => set({ selectedBuilding: null, selectedNode: null, selectedEnemy: null }),
   openChat: (villagerId) => set({ chatTarget: villagerId }),
   closeChat: () => set({ chatTarget: null }),
+
+  // Save/Resume actions
+  resumeGame: () => {
+    const s = get()
+    restoreIdCounters(s)
+
+    // Snap all mid-walk villagers to their destination so there are no stale walk states.
+    const cleanVillagers = s.villagers.map(v => {
+      const updated = { ...v }
+      if (updated.targetX !== null && updated.targetY !== null) {
+        updated.x = updated.targetX
+        updated.y = updated.targetY
+        updated.targetX = null
+        updated.targetY = null
+        updated.walkProgress = 0
+      }
+      return updated
+    })
+
+    // Remove dead enemies; live ones retarget on the next tick
+    const cleanEnemies = s.enemies.filter(e => e.health > 0)
+
+    set({ _gameStarted: true, _sessionId: s._sessionId + 1, villagers: cleanVillagers, enemies: cleanEnemies })
+  },
+  startNewGame: () => {
+    nextBuildingId = 1
+    nextEventId = 1
+    nextNodeId = 1
+    set({
+      ...INITIAL_STATE,
+      villagers: INITIAL_VILLAGERS.map(v => ({ ...v })),
+      _gameStarted: true,
+      _saveLoaded: false,
+      _sessionId: (get()._sessionId || 0) + 1,
+      // Reset UI state
+      selectedCell: null,
+      selectedBuilding: null,
+      selectedNode: null,
+      selectedEnemy: null,
+      chatTarget: null,
+      showBuildMenu: false,
+      resourcePopups: [],
+      cameraTarget: { x: 0, y: 0, z: 0 },
+      tutorial: {
+        active: !localStorage.getItem('tutorial_done'),
+        step: 'welcome',
+      },
+    })
+    // Spawn initial nodes for the fresh game
+    get().spawnNodes(0, 0, 5)
+  },
+}), {
+  name: 'village-chronicles-save',
+  // Only persist game-relevant state, not transient UI
+  partialize: (state) => ({
+    resources: state.resources,
+    population: state.population,
+    maxPopulation: state.maxPopulation,
+    wandererTimer: state.wandererTimer,
+    pendingWanderer: state.pendingWanderer,
+    buildings: state.buildings,
+    nodes: state.nodes,
+    enemies: state.enemies,
+    gameTick: state.gameTick,
+    unlockedPlots: state.unlockedPlots,
+    grid: state.grid,
+    events: state.events,
+    villagers: state.villagers,
+    gameOver: state.gameOver,
+    activeRandomEvent: state.activeRandomEvent,
+    randomEventTimer: state.randomEventTimer,
+    villageHappiness: state.villageHappiness,
+    tradeBoostActive: state.tradeBoostActive,
+    tradeBoostTimer: state.tradeBoostTimer,
+  }),
+  onRehydrateStorage: () => (state) => {
+    if (state) {
+      state._hasHydrated = true
+      if (state.gameTick > 0) {
+        state._saveLoaded = true
+      }
+    }
+  },
 }))
 
 export default useStore

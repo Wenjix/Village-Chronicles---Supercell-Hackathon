@@ -26,6 +26,7 @@ function Scene({ controlsRef }) {
   const buildings = useStore((s) => s.buildings)
   const villagers = useStore((s) => s.villagers)
   const enemies = useStore((s) => s.enemies)
+  const sessionId = useStore((s) => s._sessionId)
 
   return (
     <>
@@ -46,12 +47,12 @@ function Scene({ controlsRef }) {
       ))}
 
       {villagers.map((v) => (
-        <NPC key={v.id} villager={v} />
+        <NPC key={`${v.id}-${sessionId}`} villager={v} />
       ))}
 
       <Suspense fallback={null}>
         {enemies.map((e) => (
-          <Enemy key={e.id} enemy={e} />
+          <Enemy key={`${e.id}-${sessionId}`} enemy={e} />
         ))}
       </Suspense>
 

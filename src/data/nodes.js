@@ -21,7 +21,7 @@ export const NODE_TYPES = {
     color: '#94a3b8', // metallic
   },
   WATER: {
-    name: 'Steam Vent',
+    name: 'Water Source',
     resource: 'water',
     amountPerHarvest: 10,
     maxAmount: 200,

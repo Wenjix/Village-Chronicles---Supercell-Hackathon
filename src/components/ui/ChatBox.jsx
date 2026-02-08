@@ -7,6 +7,12 @@ import { BUILDINGS } from '../../data/buildings'
 import { getDialogueOptions } from '../../data/dialogueOptions'
 import { playNegotiateSuccess, playRefusal } from '../../utils/sounds'
 
+const BRIBE_QUICK_ACTION = {
+  label: 'Bribe (25 gears)',
+  message: "Here's 25 gears. Help me out?",
+  action: 'bribe',
+}
+
 export default function ChatBox() {
   const chatTarget = useStore((s) => s.chatTarget)
   const villagers = useStore((s) => s.villagers)
@@ -34,7 +40,6 @@ export default function ChatBox() {
   const proposedBuildings = buildings.filter((b) => b.status === 'proposed')
   const dialogueOptions = villager ? getDialogueOptions(villager.mood) : []
   const isResting = villager?.restTimer > 0
-  const isHothead = villager?.personality === 'hothead'
   const isMilitia = villager?.isMilitia
 
   useEffect(() => {
@@ -143,20 +148,25 @@ export default function ChatBox() {
       const npcResponse = result.response || result.text || 'Hmm...'
       const moodEffect = result.moodEffect || 'none'
 
-      if (moodEffect === 'improve' && villager.mood !== 'happy') {
-        negotiateWithVillager(villager.id)
-        playNegotiateSuccess()
+      if (moodEffect === 'improve') {
+        const improved = negotiateWithVillager(villager.id)
+        if (improved) {
+          playNegotiateSuccess()
+        }
         setMessages((prev) => [
           ...prev,
           { from: 'npc', text: npcResponse },
-          { from: 'system', text: `${villager.name}'s mood improves!` },
+          ...(improved ? [{ from: 'system', text: `${villager.name}'s mood improves!` }] : []),
         ])
       } else if (moodEffect === 'worsen') {
-        worsenVillagerMood(villager.id)
+        const worsened = worsenVillagerMood(villager.id)
+        if (worsened) {
+          playRefusal()
+        }
         setMessages((prev) => [
           ...prev,
           { from: 'npc', text: npcResponse },
-          { from: 'system', text: `${villager.name}'s mood worsens!`, type: 'warning' },
+          ...(worsened ? [{ from: 'system', text: `${villager.name}'s mood worsens!`, type: 'warning' }] : []),
         ])
       } else {
         setMessages((prev) => [...prev, { from: 'npc', text: npcResponse }])
@@ -265,20 +275,17 @@ export default function ChatBox() {
           <div className="p-4 bg-black/60 border-t border-brass-dim/30 space-y-4" data-tutorial="chat-input">
             {showOptions && !loading && !isResting && (
               <div className="grid grid-cols-1 gap-2">
-                {dialogueOptions.map((opt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handlePlayerMessage(opt.message, opt.action || 'talk')}
-                    className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 hover:border-brass-dim transition-all text-left"
-                  >
-                    <span className="text-xs text-zinc-300 italic">"{opt.message}"</span>
-                    {opt.action === 'bribe' && <span className="text-[10px] text-zinc-500">25⚙️</span>}
-                  </button>
-                ))}
+                <button
+                  onClick={() => handlePlayerMessage(BRIBE_QUICK_ACTION.message, BRIBE_QUICK_ACTION.action)}
+                  className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 hover:border-brass-dim transition-all text-left"
+                >
+                  <span className="text-xs text-zinc-300 italic">"{BRIBE_QUICK_ACTION.message}"</span>
+                  <span className="text-[10px] text-zinc-500">25⚙️</span>
+                </button>
               </div>
             )}
 
-            {isHothead && !isResting && (
+            {!isResting && (
               <button
                 onClick={() => draftMilitia(villager.id)}
                 className={`w-full py-2 text-[10px] font-black uppercase tracking-widest border transition-all ${isMilitia ? 'bg-red-950/40 border-red-500 text-red-200' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}

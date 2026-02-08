@@ -63,3 +63,25 @@ src/
 npm run build    # Production build to dist/
 npm run preview  # Preview production build
 ```
+
+## Credits & Assets
+
+This project uses high-quality assets from **[Kenney.nl](https://kenney.nl/)**, provided under the Creative Commons Zero (CC0) license.
+
+### UI Textures (`src/UITextures`)
+- **UI Pack (Adventure)**: Panels, borders, and decorative dividers used throughout the HUD, Build Menu, and NPC menus.
+
+### 3D Models (`src/models`)
+- **Character Assets**: Male, female, and orc low-poly models with various variations.
+- **Nature Assets**: Trees (crooked, round, high), rocks (small, large, wide), and grass ground tiles.
+- **Environment Assets**: Modular ground tiles (paths, rivers, corners, splits) and the windmill structure.
+
+### Icons (`src/icons`)
+- **Game Icons Pack**: Thematic tool icons (axe, pickaxe, sword, watering can) and UI indicators.
+
+### SFX & Music (`src/assets/sounds` and `src/assets/music`)
+Epic Soundtrack with Choir and Strings for Video Games by Matio888 -- https://freesound.org/s/789290/ -- License: Attribution 4.0
+Epic Adventure Soundtrack for Video Games by Matio888 -- https://freesound.org/s/789288/ -- License: Attribution 4.0
+Epic Soundtrack for Video Game Adventures by Matio888 -- https://freesound.org/s/789294/ -- License: Attribution 4.0
+
+Special thanks to Kenney for providing these incredible resources to the game dev community!

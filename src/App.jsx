@@ -10,18 +10,38 @@ import EnemyInfo from './components/ui/EnemyInfo'
 import PlotNavigator from './components/ui/PlotNavigator'
 import WandererInterview from './components/ui/WandererInterview'
 import Tutorial from './components/ui/Tutorial'
+import ResumeModal from './components/ui/ResumeModal'
 import useStore from './store/useStore'
+import { startBackgroundMusic } from './utils/sounds'
 
 export default function App() {
   const tick = useStore((s) => s.tick)
-  const spawnNodes = useStore((s) => s.spawnNodes)
   const gameOver = useStore((s) => s.gameOver)
+  const startNewGame = useStore((s) => s.startNewGame)
+  const hasHydrated = useStore((s) => s._hasHydrated)
+  const gameStarted = useStore((s) => s._gameStarted)
+  const saveLoaded = useStore((s) => s._saveLoaded)
 
+  // Wait for hydration, then auto-start if no save exists (new player)
   useEffect(() => {
-    spawnNodes(0, 0, 5)
+    if (!hasHydrated) return
+    if (!saveLoaded && !gameStarted) {
+      // New player — startNewGame spawns initial nodes
+      useStore.getState().startNewGame()
+    }
+  }, [hasHydrated, saveLoaded, gameStarted])
+
+  // Tick loop only runs once game is started
+  useEffect(() => {
+    if (!gameStarted) return
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [tick, spawnNodes])
+  }, [gameStarted, tick])
+
+  useEffect(() => {
+    if (!gameStarted) return
+    void startBackgroundMusic()
+  }, [gameStarted])
 
   return (
     <div className="w-full h-full relative">
@@ -36,6 +56,7 @@ export default function App() {
       <WandererInterview />
       <ChatBox />
       <Tutorial />
+      <ResumeModal />
       {gameOver && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="text-center">
@@ -46,7 +67,7 @@ export default function App() {
               The raiders have overwhelmed your settlement. All citizens have perished and the village lies in ruin.
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={startNewGame}
               className="px-8 py-3 bg-amber-900/80 border-2 border-amber-500 text-amber-200 rounded font-bold text-lg hover:bg-amber-800/80 transition-colors shadow-lg"
             >
               Start Anew

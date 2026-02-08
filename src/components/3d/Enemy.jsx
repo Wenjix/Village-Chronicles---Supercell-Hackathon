@@ -75,19 +75,36 @@ export default function Enemy({ enemy }) {
 
   const { actions } = useAnimations(clonedAnimations, modelRef)
 
+  // Determine if enemy is actually moving (not arrived at target)
+  const isMoving = useMemo(() => {
+    const dx = enemy.targetX - enemy.x
+    const dy = enemy.targetY - enemy.y
+    return Math.sqrt(dx * dx + dy * dy) > 0.2
+  }, [enemy.x, enemy.y, enemy.targetX, enemy.targetY])
+
   // Resolve which animation clip to play
   const resolvedClipName = useMemo(() => {
     if (!actions) return null
     const actionNames = Object.keys(actions)
     if (!actionNames.length) return null
-    // Prefer walk/run, fall back to first available
-    for (const name of ['walk', 'Walk', 'run', 'Run', 'sprint', 'Sprint']) {
-      if (actions[name]) return name
+
+    const findClip = (preferredNames, fallbackContains = []) => {
+      for (const name of preferredNames) {
+        if (actions[name]) return name
+      }
+      for (const fragment of fallbackContains) {
+        const found = actionNames.find((n) => n.toLowerCase().includes(fragment))
+        if (found) return found
+      }
+      return null
     }
-    const walkish = actionNames.find((n) => n.toLowerCase().includes('walk') || n.toLowerCase().includes('run'))
-    if (walkish) return walkish
-    return actionNames[0]
-  }, [actions])
+
+    if (isMoving) {
+      return findClip(['walk', 'Walk', 'run', 'Run', 'sprint', 'Sprint'], ['walk', 'run'])
+    }
+    // At target — play idle or attack if available, fall back to first clip
+    return findClip(['idle', 'Idle', 'attack-melee-right', 'attack-melee-left'], ['idle', 'attack']) || actionNames[0]
+  }, [actions, isMoving])
 
   // Play animation via useEffect (proper side effect)
   useEffect(() => {

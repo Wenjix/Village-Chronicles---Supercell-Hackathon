@@ -73,9 +73,12 @@ export default function BuildMenu() {
   const show = useStore((s) => s.showBuildMenu)
   const selectedCell = useStore((s) => s.selectedCell)
   const resources = useStore((s) => s.resources)
+  const buildings = useStore((s) => s.buildings)
   const placeBuilding = useStore((s) => s.placeBuilding)
   const closeBuildMenu = useStore((s) => s.closeBuildMenu)
   const [deficitType, setDeficitType] = useState(null)
+
+  const wonderAlreadyBuilt = buildings.some((b) => b.type === 'aether_conduit')
 
   return (
     <AnimatePresence>
@@ -104,12 +107,15 @@ export default function BuildMenu() {
           <div className="flex flex-col gap-3">
             {BUILDING_LIST.map((b) => {
               const affordable = canAfford(resources, b.type)
+              const isWonderLocked = b.type === 'aether_conduit' && wonderAlreadyBuilt
               const showDeficit = deficitType === b.type
               return (
                 <div key={b.type} data-tutorial={`build-item-${b.type}`}>
                   <motion.button
-                    whileHover={{ x: affordable ? 5 : 0 }}
+                    whileHover={{ x: (affordable && !isWonderLocked) ? 5 : 0 }}
+                    disabled={isWonderLocked}
                     onClick={() => {
+                      if (isWonderLocked) return
                       if (affordable) {
                         placeBuilding(b.type, selectedCell.x, selectedCell.y)
                         setDeficitType(null)
@@ -118,9 +124,11 @@ export default function BuildMenu() {
                       }
                     }}
                     className={`group w-full flex items-center justify-between p-4 border transition-all cursor-pointer relative overflow-hidden ${
-                      affordable
-                        ? 'border-brass-dim/20 bg-black/20 hover:bg-black/40 hover:border-amber-500'
-                        : 'border-zinc-800/60 bg-black/10 hover:border-red-900/50 hover:bg-red-950/10'
+                      isWonderLocked
+                        ? 'border-zinc-800/60 bg-black/10 opacity-50 cursor-not-allowed'
+                        : affordable
+                          ? 'border-brass-dim/20 bg-black/20 hover:bg-black/40 hover:border-amber-500'
+                          : 'border-zinc-800/60 bg-black/10 hover:border-red-900/50 hover:bg-red-950/10'
                     }`}
                   >
                     <div className="flex items-center gap-4 relative z-10">
@@ -136,12 +144,21 @@ export default function BuildMenu() {
                          b.type === 'explorers_guild' ? '🧭' :
                          b.type === 'cottage' ? '🏠' :
                          b.type === 'tesla_tower' ? '⚡' :
-                         b.type === 'watchtower' ? '🔭' : '⚙️'}
+                         b.type === 'watchtower' ? '🔭' :
+                         b.type === 'aether_foundry' ? '🔮' :
+                         b.type === 'sky_fortress' ? '🏰' :
+                         b.type === 'grand_clocktower' ? '🕰️' :
+                         b.type === 'mansion' ? '🏛️' :
+                         b.type === 'aether_conduit' ? '🌀' : '⚙️'}
                       </div>
 
                       <div className="flex flex-col items-start">
-                        <span className={`font-medieval text-sm transition-colors ${affordable ? 'text-amber-100 group-hover:text-amber-400' : 'text-zinc-400'}`}>{b.name}</span>
-                        <span className="text-[10px] text-zinc-500 italic max-w-[180px] line-clamp-1">{b.description}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-medieval text-sm transition-colors ${isWonderLocked ? 'text-zinc-500' : affordable ? 'text-amber-100 group-hover:text-amber-400' : 'text-zinc-400'}`}>{b.name}</span>
+                          {b.tier === 3 && <span className="text-[8px] px-1 py-0.5 rounded bg-purple-900/50 text-purple-300 border border-purple-700/40 font-bold uppercase">T3</span>}
+                          {b.type === 'aether_conduit' && <span className="text-[8px] px-1 py-0.5 rounded bg-cyan-900/50 text-cyan-300 border border-cyan-700/40 font-bold uppercase">Wonder</span>}
+                        </div>
+                        <span className="text-[10px] text-zinc-500 italic max-w-[180px] line-clamp-1">{isWonderLocked ? 'Already Built' : b.description}</span>
                       </div>
                     </div>
 

@@ -4,8 +4,18 @@ export const MOODS = {
   happy:   { label: 'Happy',   color: '#22c55e', emoji: '😊', buildSpeed: 1.0, refusalChance: 0.00 },
   tired:   { label: 'Tired',   color: '#60a5fa', emoji: '😴', buildSpeed: 0.7, refusalChance: 0.10 },
   grumpy:  { label: 'Grumpy',  color: '#ef4444', emoji: '😠', buildSpeed: 0.5, refusalChance: 0.30 },
+  // Legacy compatibility: old saves may still use "mad"
+  mad:     { label: 'Mad',     color: '#ef4444', emoji: '😠', buildSpeed: 0.5, refusalChance: 0.30 },
   lazy:    { label: 'Lazy',    color: '#a855f7', emoji: '😒', buildSpeed: 0.6, refusalChance: 0.40 },
   feuding: { label: 'Feuding', color: '#f97316', emoji: '🤬', buildSpeed: 0.8, refusalChance: 0.60 },
+}
+
+const LEGACY_MOOD_MAP = {
+  mad: 'grumpy',
+}
+
+export function normalizeMood(mood) {
+  return LEGACY_MOOD_MAP[mood] || mood
 }
 
 export const PERSONALITIES = {
@@ -50,7 +60,7 @@ export function rollMoodShift(personality) {
  * Returns true if they refuse.
  */
 export function rollRefusal(mood) {
-  const m = MOODS[mood]
+  const m = MOODS[normalizeMood(mood)]
   if (!m) return false
   return Math.random() < m.refusalChance
 }
@@ -59,7 +69,7 @@ export function rollRefusal(mood) {
  * Get the build timer decrement for a mood (replaces flat -1).
  */
 export function getBuildDecrement(mood) {
-  const m = MOODS[mood]
+  const m = MOODS[normalizeMood(mood)]
   return m ? m.buildSpeed : 1.0
 }
 
@@ -68,8 +78,8 @@ export function getBuildDecrement(mood) {
  */
 export function getVillageHappiness(villagers) {
   if (!villagers || villagers.length === 0) return 50
-  const moodScores = { happy: 100, tired: 60, grumpy: 20, lazy: 40, feuding: 10 }
-  const total = villagers.reduce((sum, v) => sum + (moodScores[v.mood] || 50), 0)
+  const moodScores = { happy: 100, tired: 60, grumpy: 20, mad: 20, lazy: 40, feuding: 10 }
+  const total = villagers.reduce((sum, v) => sum + (moodScores[normalizeMood(v.mood)] || 50), 0)
   return Math.round(total / villagers.length)
 }
 

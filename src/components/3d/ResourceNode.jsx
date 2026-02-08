@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { Html, useFBX, useTexture } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CELL_SIZE } from '../../utils/gridUtils'
 import { NODE_TYPES } from '../../data/nodes'
@@ -79,6 +80,51 @@ function scaleToFit(object, targetSize) {
   return { scale, yOffset }
 }
 
+function createWaterTexture() {
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+
+  // Base water tone
+  ctx.fillStyle = '#0ea5e9'
+  ctx.fillRect(0, 0, size, size)
+
+  // Subtle wave bands
+  ctx.globalAlpha = 0.18
+  ctx.fillStyle = '#7dd3fc'
+  for (let y = -size; y < size * 2; y += 16) {
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.quadraticCurveTo(size * 0.5, y + 6, size, y)
+    ctx.lineTo(size, y + 8)
+    ctx.quadraticCurveTo(size * 0.5, y + 14, 0, y + 8)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  // Sparkle noise
+  ctx.globalAlpha = 0.12
+  ctx.fillStyle = '#e0f2fe'
+  for (let i = 0; i < 120; i += 1) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const r = Math.random() * 1.8 + 0.3
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(2, 2)
+  texture.needsUpdate = true
+  return texture
+}
+
 export default function ResourceNode({ node }) {
   const { gridX, gridY, type, remainingAmount, respawnTimer } = node
   const typeDef = NODE_TYPES[type]
@@ -143,6 +189,16 @@ export default function ResourceNode({ node }) {
     return { object: cloned, scale, yOffset }
   }, [isWood, isStone, isMetal, gridX, gridY, colormap, ...treeSources, ...rockSources])
 
+  const pondTexture = useMemo(() => (type === 'WATER' ? createWaterTexture() : null), [type])
+
+  useEffect(() => () => pondTexture?.dispose(), [pondTexture])
+
+  useFrame((_, delta) => {
+    if (!pondTexture) return
+    pondTexture.offset.x = (pondTexture.offset.x + delta * 0.06) % 1
+    pondTexture.offset.y = (pondTexture.offset.y + delta * 0.03) % 1
+  })
+
   return (
     <group position={[x, 0, z]}>
       <group scale={isDepleted ? 0.5 : 1}>
@@ -150,15 +206,12 @@ export default function ResourceNode({ node }) {
         <primitive object={model.object} scale={model.scale} position={[0, model.yOffset, 0]} />
       )}
 
-      {!isWood && !isStone && !isMetal && !isOutpost && (
+      {!isWood && !isStone && !isMetal && !isOutpost && type !== 'WATER' && (
         <mesh position={[0, 0.4, 0]}>
-          {type === 'WATER' && <torusGeometry args={[0.3, 0.1, 8, 16]} rotation={[Math.PI / 2, 0, 0]} />}
           <meshStandardMaterial
             color={typeDef.color}
             metalness={0.2}
             roughness={0.4}
-            emissive={type === 'WATER' ? typeDef.color : 'black'}
-            emissiveIntensity={0.5}
           />
         </mesh>
       )}
@@ -203,10 +256,32 @@ export default function ResourceNode({ node }) {
       )}
 
       {/* Ground indicator */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <circleGeometry args={[0.6, 16]} />
-        <meshStandardMaterial color={typeDef.color} transparent opacity={0.2} />
-      </mesh>
+      {type === 'WATER' ? (
+        <>
+          {/* Grass-colored square so pond blends with terrain */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+            <planeGeometry args={[1.05, 1.05]} />
+            <meshStandardMaterial color="#4d7f3b" roughness={1} metalness={0} />
+          </mesh>
+          {/* Opaque blue pond surface */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+            <circleGeometry args={[0.42, 28]} />
+            <meshStandardMaterial
+              color="#0ea5e9"
+              map={pondTexture}
+              roughness={0.3}
+              metalness={0.05}
+              emissive="#0369a1"
+              emissiveIntensity={0.15}
+            />
+          </mesh>
+        </>
+      ) : (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+          <circleGeometry args={[0.6, 16]} />
+          <meshStandardMaterial color={typeDef.color} transparent opacity={0.2} />
+        </mesh>
+      )}
     </group>
   )
 }

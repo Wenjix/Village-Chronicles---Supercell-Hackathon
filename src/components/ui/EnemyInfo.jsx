@@ -75,7 +75,7 @@ export default function EnemyInfo() {
           <div className="bg-red-950/20 border border-red-900/30 p-3 mb-6 rounded-sm">
             <p className="text-xs text-red-300/80 italic leading-relaxed">
               {militiaCount === 0
-                ? 'You have no militia! Draft hothead villagers via the chat panel to defend the village.'
+                ? 'You have no militia! Draft villagers via the chat panel to defend the village.'
                 : 'Rally your militia to intercept this raider. Busy militia will be pulled from their current tasks.'}
             </p>
           </div>

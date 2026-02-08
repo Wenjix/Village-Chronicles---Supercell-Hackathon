@@ -9,7 +9,8 @@ export default function NodeInfo() {
   const nodes = useStore((s) => s.nodes)
   const villagers = useStore((s) => s.villagers)
   const buildings = useStore((s) => s.buildings)
-  const closeInfo = useStore((s) => s.closeInfo)  const openChat = useStore((s) => s.openChat)
+  const closeInfo = useStore((s) => s.closeInfo)
+  const openChat = useStore((s) => s.openChat)
   const assignVillagerToNode = useStore((s) => s.assignVillagerToNode)
   const unassignVillager = useStore((s) => s.unassignVillager)
 
@@ -173,7 +174,7 @@ export default function NodeInfo() {
                </p>
                {allWorkersBusy ? (
                  <p className="text-xs text-red-500 font-bold italic">
-                   {isOutpost ? 'No militia members available — draft hotheads via chat first' : 'Critical: No Available Personnel'}
+                   {isOutpost ? 'No militia members available — draft villagers via chat first' : 'Critical: No Available Personnel'}
                  </p>
                ) : (
                  <div className="space-y-2">
@@ -209,15 +210,15 @@ export default function NodeInfo() {
                              </span>
                            )}
                          </div>
-                         <span className="text-[10px] font-black uppercase shrink-0 ml-2" style={{ color: MOODS[v.mood]?.color }}>
-                           {MOODS[v.mood]?.label}
-                         </span>
-                         <span className="text-[9px] text-zinc-500 uppercase tracking-tight ml-2 shrink-0">
-                           {Math.round((MOODS[v.mood]?.refusalChance || 0) * 100)}% refuse
-                         </span>
-                       </button>
-                     )
-                   })}
+                          <span className="text-[10px] font-black uppercase shrink-0 ml-2" style={{ color: MOODS[v.mood]?.color }}>
+                            {MOODS[v.mood]?.label}
+                          </span>
+                          <span className="text-[9px] text-zinc-500 uppercase tracking-tight ml-2 shrink-0">
+                            {Math.round((MOODS[v.mood]?.refusalChance || 0) * 100)}% refuse
+                          </span>
+                        </button>
+                      )
+                    })}
                  </div>
                )}
             </div>

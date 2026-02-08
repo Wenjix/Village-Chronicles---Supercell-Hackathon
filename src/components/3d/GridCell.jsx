@@ -4,11 +4,20 @@ import * as THREE from 'three'
 import { gridToWorld, CELL_SIZE } from '../../utils/gridUtils'
 import useStore from '../../store/useStore'
 import grassUrl from '../../models/grass/ground_grass.glb'
+import riverOpenUrl from '../../models/ground/ground_riverOpen.glb'
 
 export default function GridCell({ x, y, occupied }) {
   const [hovered, setHovered] = useState(false)
   const selectCell = useStore((s) => s.selectCell)
   const grid = useStore((s) => s.grid)
+  const hasWaterNode = useStore((s) => {
+    const key = `${x},${y}`
+    const cell = s.grid[key]
+    if (typeof cell !== 'string' || !cell.startsWith('node-')) return false
+    const nodeId = parseInt(cell.split('-')[1], 10)
+    const node = s.nodes.find((n) => n.id === nodeId)
+    return node?.type === 'WATER'
+  })
   const [wx, , wz] = gridToWorld(x, y)
 
   const key = `${x},${y}`
@@ -16,15 +25,21 @@ export default function GridCell({ x, y, occupied }) {
   const clickable = !occupied || isNode
 
   const grassSource = useGLTF(grassUrl)
+  const riverOpenSource = useGLTF(riverOpenUrl)
+  const groundSource = hasWaterNode ? riverOpenSource : grassSource
 
   const grass = useMemo(() => {
-    const cloned = grassSource.scene.clone(true)
+    const cloned = groundSource.scene.clone(true)
     cloned.traverse((child) => {
       if (!child.isMesh) return
-      // Ensure embedded textures use correct color space
-      if (child.material?.map) {
-        child.material.map.colorSpace = THREE.SRGBColorSpace
-      }
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      materials.forEach((mat) => {
+        if (!mat) return
+        // Ensure embedded textures use correct color space
+        if (mat.map) {
+          mat.map.colorSpace = THREE.SRGBColorSpace
+        }
+      })
       child.receiveShadow = true
     })
 
@@ -37,7 +52,7 @@ export default function GridCell({ x, y, occupied }) {
     const yOffset = -bounds.min.y * scale
 
     return { object: cloned, scale, yOffset }
-  }, [grassSource])
+  }, [groundSource, hasWaterNode])
 
   return (
     <group position={[wx, 0, wz]}>

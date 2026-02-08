@@ -225,7 +225,7 @@ function Cottage({ active }) {
         <boxGeometry args={[0.6, 0.5, 0.6]} />
         <meshStandardMaterial color="#f59e0b" metalness={0.2} roughness={0.8} />
       </mesh>
-      <mesh position={[0, 0.6, 0]} rotation={[0, Math.PI/4, 0]}>
+      <mesh position={[0, 0.64, 0]} rotation={[0, Math.PI/4, 0]}>
         <coneGeometry args={[0.5, 0.4, 4]} />
         <meshStandardMaterial color="#b45309" />
       </mesh>

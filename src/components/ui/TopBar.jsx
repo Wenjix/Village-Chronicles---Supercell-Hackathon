@@ -4,6 +4,7 @@ import useStore from '../../store/useStore'
 import { RANDOM_EVENTS } from '../../data/moods'
 import panelTextureUrl from '../../UITextures/panel-003.png'
 import panelBorderUrl from '../../UITextures/panel-transparent-border-002.png'
+import { isMusicMuted, toggleMusicMuted } from '../../utils/sounds'
 
 function ResourceChip({ label, value, icon, glowClass, prevValue, borderClass, isRare = false }) {
   const [diff, setDiff] = useState(null)
@@ -96,6 +97,7 @@ export default function TopBar() {
   const activeRandomEvent = useStore((s) => s.activeRandomEvent)
   const randomEventTimer = useStore((s) => s.randomEventTimer)
   const [prev, setPrev] = useState(resources)
+  const [musicMuted, setMusicMuted] = useState(isMusicMuted())
 
   useEffect(() => {
     const t = setTimeout(() => setPrev(resources), 100)
@@ -104,6 +106,10 @@ export default function TopBar() {
 
   const activeBuildings = buildings.filter((b) => b.status === 'active').length
   const evt = activeRandomEvent ? RANDOM_EVENTS[activeRandomEvent] : null
+
+  function handleToggleMusic() {
+    setMusicMuted(toggleMusicMuted())
+  }
 
   return (
     <motion.div
@@ -159,6 +165,17 @@ export default function TopBar() {
           </div>
 
           <div className="flex flex-col gap-1 items-end min-w-[150px]">
+            <button
+              onClick={handleToggleMusic}
+              className={`px-2.5 py-1 rounded-sm border text-[10px] font-black uppercase tracking-wider transition-all ${
+                musicMuted
+                  ? 'bg-zinc-900/80 border-zinc-600 text-zinc-300 hover:border-zinc-400'
+                  : 'bg-emerald-900/60 border-emerald-500 text-emerald-200 hover:border-emerald-300'
+              }`}
+              title={musicMuted ? 'Unmute Music' : 'Mute Music'}
+            >
+              {musicMuted ? '🔇 Music Off' : '🔊 Music On'}
+            </button>
             <StatusSlot active={tradeBoostActive} className="bg-amber-900/80 border-amber-500 text-amber-100 shadow-[0_0_15px_rgba(181,137,28,0.4)]">
               <span className="animate-pulse shrink-0">⚡</span>
               <span className="truncate font-medieval tracking-widest text-xs">SURGE {tradeBoostTimer}s</span>
