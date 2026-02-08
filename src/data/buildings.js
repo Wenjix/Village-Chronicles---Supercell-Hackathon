@@ -4,13 +4,17 @@ export const BUILDING_TYPES = {
   CRYSTAL_REFINERY: 'crystal_refinery',
   AIRSHIP_DOCK: 'airship_dock',
   INVENTORS_WORKSHOP: 'inventors_workshop',
+  EXPLORERS_GUILD: 'explorers_guild',
+  COTTAGE: 'cottage',
+  TESLA_TOWER: 'tesla_tower',
+  WATCHTOWER: 'watchtower',
 }
 
 export const BUILDINGS = {
   [BUILDING_TYPES.CLOCKWORK_FORGE]: {
     name: 'Clockwork Forge',
-    description: 'A rumbling forge that hammers out precision gears day and night.',
-    cost: { gears: 0, steam: 0, crystals: 0 },
+    description: 'Burns wood to smelt metal into precision gears. The backbone of industry.',
+    cost: { wood: 20, stone: 15, metal: 10 },
     buildTime: 10,
     produces: { gears: 5 },
     color: '#b87333',
@@ -18,8 +22,8 @@ export const BUILDINGS = {
   },
   [BUILDING_TYPES.STEAM_MILL]: {
     name: 'Steam Mill',
-    description: 'Pressurized chambers that harness raw steam power.',
-    cost: { gears: 50, steam: 0, crystals: 0 },
+    description: 'Stone-walled pressure chambers that boil water into raw steam power.',
+    cost: { wood: 15, stone: 20, water: 15 },
     buildTime: 15,
     produces: { steam: 3 },
     color: '#9ca3af',
@@ -27,8 +31,8 @@ export const BUILDINGS = {
   },
   [BUILDING_TYPES.CRYSTAL_REFINERY]: {
     name: 'Crystal Refinery',
-    description: 'An arcane distillery that purifies raw aether into crystals.',
-    cost: { gears: 100, steam: 50, crystals: 0 },
+    description: 'Gear-driven arcane distillery, powered by steam, that purifies raw aether into crystals.',
+    cost: { metal: 20, gears: 40, steam: 30 },
     buildTime: 30,
     produces: { crystals: 1 },
     color: '#a855f7',
@@ -37,7 +41,7 @@ export const BUILDINGS = {
   [BUILDING_TYPES.AIRSHIP_DOCK]: {
     name: 'Airship Dock',
     description: 'A landing platform for trade zeppelins. Doubles output for 30s.',
-    cost: { gears: 80, steam: 40, crystals: 20 },
+    cost: { wood: 30, metal: 20, gears: 50, steam: 30 },
     buildTime: 45,
     produces: {},
     special: 'trade_boost',
@@ -48,20 +52,62 @@ export const BUILDINGS = {
   [BUILDING_TYPES.INVENTORS_WORKSHOP]: {
     name: "Inventor's Workshop",
     description: 'A mad genius labors here, unlocking new blueprints.',
-    cost: { gears: 150, steam: 75, crystals: 30 },
+    cost: { metal: 30, gears: 60, steam: 40, crystals: 10 },
     buildTime: 60,
     produces: {},
     special: 'blueprints',
     color: '#2563eb',
     emissive: '#1d4ed8',
   },
+  [BUILDING_TYPES.EXPLORERS_GUILD]: {
+    name: "Explorer's Guild",
+    description: 'Brave scouts map the surrounding wilderness.',
+    cost: { wood: 25, stone: 20, gears: 40, steam: 30 },
+    buildTime: 40,
+    produces: {},
+    special: 'explorer',
+    color: '#10b981',
+    emissive: '#059669',
+  },
+  [BUILDING_TYPES.COTTAGE]: {
+    name: "Quaint Cottage",
+    description: 'A cozy home built from timber and stone.',
+    cost: { wood: 20, stone: 15 },
+    buildTime: 12,
+    produces: {},
+    special: 'housing',
+    capacity: 4,
+    color: '#f59e0b',
+    emissive: '#d97706',
+  },
+  [BUILDING_TYPES.TESLA_TOWER]: {
+    name: "Tesla Tower",
+    description: 'Crackling with energy, it zaps approaching threats.',
+    cost: { metal: 25, gears: 40, steam: 20, crystals: 5 },
+    buildTime: 25,
+    produces: {},
+    special: 'defense',
+    range: 3,
+    damage: 10,
+    color: '#38bdf8',
+    emissive: '#0284c7',
+  },
+  [BUILDING_TYPES.WATCHTOWER]: {
+    name: "Watchtower",
+    description: 'A tall timber-and-stone tower to spot incoming raiders.',
+    cost: { wood: 25, stone: 20 },
+    buildTime: 15,
+    produces: {},
+    special: 'vision',
+    range: 6,
+    color: '#fbbf24',
+    emissive: '#d97706',
+  },
 }
 
 export function canAfford(resources, buildingType) {
   const cost = BUILDINGS[buildingType].cost
-  return (
-    resources.gears >= (cost.gears || 0) &&
-    resources.steam >= (cost.steam || 0) &&
-    resources.crystals >= (cost.crystals || 0)
+  return Object.entries(cost).every(
+    ([resource, amount]) => (resources[resource] || 0) >= amount
   )
 }
