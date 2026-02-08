@@ -3,15 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { aiHarness } from '../../services/ai/aiHarness'
 import { MOODS } from '../../data/moods'
-import { BUILDINGS } from '../../data/buildings'
 import { getDialogueOptions } from '../../data/dialogueOptions'
 import { playNegotiateSuccess, playRefusal } from '../../utils/sounds'
-
-const BRIBE_QUICK_ACTION = {
-  label: 'Bribe (25 gears)',
-  message: "Here's 25 gears. Help me out?",
-  action: 'bribe',
-}
 
 export default function ChatBox() {
   const chatTarget = useStore((s) => s.chatTarget)
@@ -275,13 +268,30 @@ export default function ChatBox() {
           <div className="p-4 bg-black/60 border-t border-brass-dim/30 space-y-4" data-tutorial="chat-input">
             {showOptions && !loading && !isResting && (
               <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={() => handlePlayerMessage(BRIBE_QUICK_ACTION.message, BRIBE_QUICK_ACTION.action)}
-                  className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 hover:border-brass-dim transition-all text-left"
-                >
-                  <span className="text-sm text-zinc-300 italic">"{BRIBE_QUICK_ACTION.message}"</span>
-                  <span className="text-xs text-zinc-500">25⚙️</span>
-                </button>
+                {dialogueOptions.map((opt, idx) => {
+                  const isBribe = opt.action === 'bribe'
+                  const bribeCost = opt.cost || 25
+                  const canAffordBribe = !isBribe || (resources.gears || 0) >= bribeCost
+
+                  return (
+                    <button
+                      key={`${opt.label}-${idx}`}
+                      onClick={() => handlePlayerMessage(opt.message, opt.action || 'talk')}
+                      disabled={!canAffordBribe}
+                      className={`flex items-center justify-between px-3 py-2 border transition-all text-left ${
+                        canAffordBribe
+                          ? 'bg-zinc-900/50 border-zinc-800 hover:border-brass-dim'
+                          : 'bg-zinc-900/30 border-red-900/40 text-zinc-500 cursor-not-allowed'
+                      }`}
+                      title={canAffordBribe ? opt.label : `Need ${bribeCost} gears`}
+                    >
+                      <span className="text-sm text-zinc-300 italic">"{opt.message}"</span>
+                      <span className="text-xs text-zinc-500 shrink-0 ml-3">
+                        {isBribe ? `${bribeCost}⚙️` : opt.action === 'rest' ? 'REST' : 'TALK'}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             )}
 
