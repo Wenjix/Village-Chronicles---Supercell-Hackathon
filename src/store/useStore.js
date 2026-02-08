@@ -1,56 +1,77 @@
 import { create } from 'zustand'
 import { BUILDINGS, canAfford } from '../data/buildings'
 import { getRandomChronicle, getMoodChronicle } from '../data/chronicles'
-import { GRID_SIZE, createEmptyGrid } from '../utils/gridUtils'
+import { PLOT_SIZE, createEmptyGrid, isValidCell } from '../utils/gridUtils'
 import { playBuildStart, playBuildComplete, playUpgrade, playRefusal, playNegotiateSuccess, playRandomEvent } from '../utils/sounds'
 import { MOODS, rollMoodShift, rollRefusal, getBuildDecrement, getVillageHappiness, rollRandomEvent, RANDOM_EVENTS } from '../data/moods'
+import { NODE_TYPES, getRandomNodeType, GUARANTEED_NODE_TYPES } from '../data/nodes'
 
 let nextBuildingId = 1
 let nextEventId = 1
+let nextNodeId = 1
 
 const useStore = create((set, get) => ({
   // Resources
-  resources: { gears: 100, steam: 0, crystals: 0, blueprints: 0 },
+  resources: { wood: 0, stone: 0, metal: 0, water: 0, gears: 0, steam: 0, crystals: 0, blueprints: 0 },
 
-  // Population — grows with active buildings
+  // Population and Housing
   population: 3,
+  maxPopulation: 3,
+  wandererTimer: 60,
+  pendingWanderer: null,
 
   // Buildings placed on grid
   buildings: [],
 
-  // 8x8 grid — null or building id
+  // Natural resource nodes
+  nodes: [],
+
+  // Enemies (Phase 4)
+  enemies: [],
+  threatMeter: 0,
+
+  // Unlocked plots (8x8 chunks)
+  unlockedPlots: [{ x: 0, y: 0 }],
+
+  // Object-based grid: { "x,y": id or "node-id" }
   grid: createEmptyGrid(),
 
   // Chronicle events
   events: [],
 
-  // NPC villagers (expanded with mood & personality)
+  // NPC villagers
   villagers: [
     {
       id: 1, name: 'Barnaby Cogsworth', role: 'Engineer', x: 2, y: 2,
       homeX: 2, homeY: 2,
       mood: 'happy', personality: 'diligent', moodTimer: 30,
-      assignedBuildingId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
+      health: 100, maxHealth: 100, isMilitia: false,
     },
     {
       id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
       homeX: 5, homeY: 3,
       mood: 'happy', personality: 'cheerful', moodTimer: 25,
-      assignedBuildingId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
+      health: 100, maxHealth: 100, isMilitia: false,
     },
     {
       id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
       homeX: 4, homeY: 6,
       mood: 'happy', personality: 'hothead', moodTimer: 20,
-      assignedBuildingId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
+      health: 100, maxHealth: 100, isMilitia: false,
     },
   ],
+
+  // Game over
+  gameOver: false,
 
   // Random event state
   activeRandomEvent: null,
@@ -59,23 +80,115 @@ const useStore = create((set, get) => ({
   // Village happiness (0-100)
   villageHappiness: 100,
 
+  // Camera
+  cameraTarget: { x: 0, y: 0, z: 0 },
+  setCameraTarget: (x, z) => set({ cameraTarget: { x, y: 0, z } }),
+  focusPlot: (px, py) => {
+    const [wx, , wz] = gridToWorld(px * PLOT_SIZE + 3.5, py * PLOT_SIZE + 3.5)
+    set({ cameraTarget: { x: wx, y: 0, z: wz } })
+  },
+
   // UI state
   selectedCell: null,
   selectedBuilding: null,
+  selectedNode: null,
   chatTarget: null,
   showBuildMenu: false,
   tradeBoostActive: false,
   tradeBoostTimer: 0,
   resourcePopups: [],
 
-  // Place a building — now creates as 'proposed' status
+  // Initialize nodes procedurally for a specific plot
+  spawnNodes: (plotX, plotY, count = 3) => {
+    set((s) => {
+      const newNodes = [...s.nodes]
+      const newGrid = { ...s.grid }
+      const isStartingPlot = plotX === 0 && plotY === 0
+
+      // Build a queue of types to spawn: guaranteed first, then random fill
+      const typeQueue = []
+      if (isStartingPlot) {
+        typeQueue.push(...GUARANTEED_NODE_TYPES)
+      } else {
+        // Non-starting plots always get at least one outpost
+        typeQueue.push('OUTPOST')
+      }
+      while (typeQueue.length < count) {
+        const isOutpostEligible = !isStartingPlot && Math.random() > 0.8
+        typeQueue.push(isOutpostEligible ? 'OUTPOST' : getRandomNodeType())
+      }
+
+      let spawned = 0
+      let attempts = 0
+      while (spawned < typeQueue.length && attempts < 100) {
+        attempts++
+        const rx = plotX * PLOT_SIZE + Math.floor(Math.random() * PLOT_SIZE)
+        const ry = plotY * PLOT_SIZE + Math.floor(Math.random() * PLOT_SIZE)
+
+        const key = `${rx},${ry}`
+        if (!newGrid[key]) {
+          // Don't spawn too close to villagers start (only for plot 0,0)
+          if (isStartingPlot) {
+             const isTooClose = s.villagers.some(v => Math.abs(v.homeX - rx) <= 1 && Math.abs(v.homeY - ry) <= 1)
+             if (isTooClose) continue
+          }
+
+          const id = nextNodeId++
+          const type = typeQueue[spawned]
+          const node = {
+            id,
+            type,
+            gridX: rx,
+            gridY: ry,
+            remainingAmount: type === 'OUTPOST' ? 500 : NODE_TYPES[type].maxAmount
+          }
+          newNodes.push(node)
+          newGrid[key] = `node-${id}`
+          spawned++
+        }
+      }
+      return { nodes: newNodes, grid: newGrid }
+    })
+  },
+
+  // Unlock a new plot
+  unlockPlot: (px, py) => {
+    const state = get()
+    if (state.unlockedPlots.some(p => p.x === px && p.y === py)) return false
+    
+    // Check cost: 50 steam, 5 blueprints
+    if (state.resources.steam < 50 || state.resources.blueprints < 5) return false
+
+    set((s) => ({
+      unlockedPlots: [...s.unlockedPlots, { x: px, y: py }],
+      resources: {
+        ...s.resources,
+        steam: s.resources.steam - 50,
+        blueprints: s.resources.blueprints - 5
+      }
+    }))
+
+    // Procedurally generate nodes for the new plot
+    get().spawnNodes(px, py, 4 + Math.floor(Math.random() * 3))
+
+    const chronicle = `Our scouts have surveyed and reclaimed the lands at [${px}, ${py}]. The frontier expands!`
+    set((s) => ({
+      events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+    }))
+
+    return true
+  },
+
+  // Place a building
   placeBuilding: (type, gridX, gridY) => {
     const state = get()
     const def = BUILDINGS[type]
     if (!def) return false
     if (!canAfford(state.resources, type)) return false
-    if (gridX < 0 || gridX >= GRID_SIZE || gridY < 0 || gridY >= GRID_SIZE) return false
-    if (state.grid[gridY][gridX] !== null) return false
+    if (!isValidCell(gridX, gridY, state.unlockedPlots)) return false
+    
+    const key = `${gridX},${gridY}`
+    if (state.grid[key]) return false
 
     const id = nextBuildingId++
     const building = {
@@ -86,34 +199,76 @@ const useStore = create((set, get) => ({
       status: 'proposed',
       timer: def.buildTime,
       level: 1,
+      health: 100,
+      maxHealth: 100,
       assignedVillager: null,
     }
 
     set((s) => {
-      const newGrid = s.grid.map((row) => [...row])
-      newGrid[gridY][gridX] = id
+      const newGrid = { ...s.grid }
+      newGrid[key] = id
 
       const chronicle = getMoodChronicle('proposed', { building: def.name })
       const newEvents = chronicle
         ? [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now(), buildingType: type }]
         : [...s.events]
 
+      const newResources = { ...s.resources }
+      Object.entries(def.cost).forEach(([resource, amount]) => {
+        newResources[resource] = (newResources[resource] || 0) - amount
+      })
+
       return {
         buildings: [...s.buildings, building],
         grid: newGrid,
-        resources: {
-          gears: s.resources.gears - (def.cost.gears || 0),
-          steam: s.resources.steam - (def.cost.steam || 0),
-          crystals: s.resources.crystals - (def.cost.crystals || 0),
-          blueprints: s.resources.blueprints,
-        },
+        resources: newResources,
         events: newEvents,
         showBuildMenu: false,
         selectedCell: null,
         selectedBuilding: id,
+        selectedNode: null,
       }
     })
     playBuildStart()
+    return true
+  },
+
+  // Unassign a villager from their current task and send them home
+  unassignVillager: (villagerId) => {
+    const state = get()
+    const villager = state.villagers.find((v) => v.id === villagerId)
+    if (!villager) return false
+
+    set((s) => ({
+      // If assigned to a building that was in proposed/assigned state, revert it
+      buildings: s.buildings.map((b) =>
+        b.assignedVillager === villagerId && (b.status === 'assigned')
+          ? { ...b, status: 'proposed', assignedVillager: null }
+          : b
+      ),
+      villagers: s.villagers.map((v) => {
+        if (v.id !== villagerId) return v
+        // Snap x,y to current interpolated position so they don't teleport
+        let currentX = v.x
+        let currentY = v.y
+        if (v.targetX !== null && v.targetY !== null) {
+          const t = Math.min(v.walkProgress, 1)
+          currentX = v.x + (v.targetX - v.x) * t
+          currentY = v.y + (v.targetY - v.y) * t
+        }
+        return {
+          ...v,
+          x: currentX,
+          y: currentY,
+          assignedBuildingId: null,
+          assignedNodeId: null,
+          targetX: v.homeX,
+          targetY: v.homeY,
+          walkProgress: 0,
+          _harvestTimer: 0,
+        }
+      }),
+    }))
     return true
   },
 
@@ -124,10 +279,14 @@ const useStore = create((set, get) => ({
     const villager = state.villagers.find((v) => v.id === villagerId)
     if (!building || building.status !== 'proposed') return { success: false, reason: 'not_proposed' }
     if (!villager) return { success: false, reason: 'no_villager' }
-    if (villager.assignedBuildingId) return { success: false, reason: 'already_busy' }
     if (villager.restTimer > 0) return { success: false, reason: 'resting' }
 
-    // Check for refusal (mercy rule: auto-succeed after 3 negotiations)
+    // Auto-unassign from previous task
+    if (villager.assignedBuildingId || villager.assignedNodeId) {
+      get().unassignVillager(villagerId)
+    }
+
+    // Check for refusal
     if (villager.negotiationCount < 3 && rollRefusal(villager.mood)) {
       playRefusal()
       const def = BUILDINGS[building.type]
@@ -144,20 +303,17 @@ const useStore = create((set, get) => ({
       return { success: false, reason: 'refused', mood: villager.mood }
     }
 
-    // Assign — villager walks to adjacent cell then construction starts
-    // Pick an adjacent cell (prefer south, then east, west, north) that isn't occupied
+    // Assign — pick adjacent empty cell
     const adjacentOffsets = [
-      { dx: 0, dy: 1 },  // south (in front)
-      { dx: 1, dy: 0 },  // east
-      { dx: -1, dy: 0 }, // west
-      { dx: 0, dy: -1 }, // north
+      { dx: 0, dy: 1 }, { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: -1 }
     ]
     let workX = building.gridX
-    let workY = building.gridY + 1 // default: south
+    let workY = building.gridY + 1
     for (const off of adjacentOffsets) {
       const nx = building.gridX + off.dx
       const ny = building.gridY + off.dy
-      if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && state.grid[ny][nx] === null) {
+      const key = `${nx},${ny}`
+      if (isValidCell(nx, ny, state.unlockedPlots) && !state.grid[key]) {
         workX = nx
         workY = ny
         break
@@ -173,6 +329,7 @@ const useStore = create((set, get) => ({
           ? {
               ...v,
               assignedBuildingId: buildingId,
+              assignedNodeId: null,
               targetX: workX,
               targetY: workY,
               walkProgress: 0,
@@ -196,13 +353,71 @@ const useStore = create((set, get) => ({
     return { success: true }
   },
 
+  // Assign villager to resource node for harvesting
+  assignVillagerToNode: (nodeId, villagerId) => {
+    const state = get()
+    const node = state.nodes.find((n) => n.id === nodeId)
+    const villager = state.villagers.find((v) => v.id === villagerId)
+    if (!node || node.remainingAmount <= 0) return { success: false, reason: 'node_empty' }
+    if (!villager) return { success: false, reason: 'no_villager' }
+    if (villager.restTimer > 0) return { success: false, reason: 'resting' }
+
+    // Auto-unassign from previous task
+    if (villager.assignedBuildingId || villager.assignedNodeId) {
+      get().unassignVillager(villagerId)
+    }
+
+    // Pick adjacent cell
+    const adjacentOffsets = [
+      { dx: 0, dy: 1 }, { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: -1 }
+    ]
+    let workX = node.gridX
+    let workY = node.gridY + 1
+    for (const off of adjacentOffsets) {
+      const nx = node.gridX + off.dx
+      const ny = node.gridY + off.dy
+      const key = `${nx},${ny}`
+      if (isValidCell(nx, ny, state.unlockedPlots) && !state.grid[key]) {
+        workX = nx
+        workY = ny
+        break
+      }
+    }
+
+    set((s) => ({
+      villagers: s.villagers.map((v) =>
+        v.id === villagerId
+          ? {
+              ...v,
+              assignedNodeId: nodeId,
+              assignedBuildingId: null,
+              targetX: workX,
+              targetY: workY,
+              walkProgress: 0,
+              negotiationCount: 0,
+            }
+          : v
+      ),
+    }))
+
+    const chronicle = getMoodChronicle('assigned_harvesting', {
+      villager: villager.name,
+      node: NODE_TYPES[node.type].name,
+    }) || `${villager.name} sets off to harvest from the ${NODE_TYPES[node.type].name}.`
+
+    set((s) => ({
+      events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }],
+    }))
+
+    return { success: true }
+  },
+
   // Negotiate with a villager to improve their mood
   negotiateWithVillager: (villagerId) => {
     const state = get()
     const villager = state.villagers.find((v) => v.id === villagerId)
     if (!villager) return false
 
-    // Negotiation improves mood toward happy
     const moodImprovement = { grumpy: 'tired', tired: 'happy', lazy: 'tired', feuding: 'grumpy', happy: 'happy' }
     const newMood = moodImprovement[villager.mood] || 'happy'
     const improved = newMood !== villager.mood
@@ -238,7 +453,7 @@ const useStore = create((set, get) => ({
     return improved
   },
 
-  // Worsen a villager's mood (consequence of rude/hostile dialogue)
+  // Worsen a villager's mood
   worsenVillagerMood: (villagerId) => {
     const state = get()
     const villager = state.villagers.find((v) => v.id === villagerId)
@@ -248,7 +463,6 @@ const useStore = create((set, get) => ({
     const newMood = moodDecline[villager.mood] || villager.mood
     const worsened = newMood !== villager.mood
 
-    // If entering feuding, pick a random feud target
     let feudTarget = villager.feudTarget
     if (newMood === 'feuding' && !feudTarget && state.villagers.length > 1) {
       const others = state.villagers.filter((o) => o.id !== villagerId)
@@ -280,7 +494,7 @@ const useStore = create((set, get) => ({
     return worsened
   },
 
-  // Bribe a villager — costs gears, improves mood by 2 steps
+  // Bribe a villager
   bribeVillager: (villagerId) => {
     const state = get()
     const villager = state.villagers.find((v) => v.id === villagerId)
@@ -289,7 +503,6 @@ const useStore = create((set, get) => ({
     const bribeCost = 25
     if (state.resources.gears < bribeCost) return { success: false, reason: 'no_funds' }
 
-    // Two-step mood improvement
     const moodImprovement = { grumpy: 'tired', tired: 'happy', lazy: 'happy', feuding: 'tired', happy: 'happy' }
     const step1 = moodImprovement[villager.mood] || 'happy'
     const newMood = moodImprovement[step1] || step1
@@ -318,12 +531,12 @@ const useStore = create((set, get) => ({
     return { success: true, cost: bribeCost, newMood }
   },
 
-  // Send a villager to rest — unavailable for a cooldown period, but fully restores mood
+  // Send a villager to rest
   restVillager: (villagerId) => {
     const state = get()
     const villager = state.villagers.find((v) => v.id === villagerId)
     if (!villager) return false
-    if (villager.assignedBuildingId) return false
+    if (villager.assignedBuildingId || villager.assignedNodeId) return false
     if (villager.restTimer > 0) return false
 
     set((s) => ({
@@ -344,18 +557,18 @@ const useStore = create((set, get) => ({
     return true
   },
 
-  // Game tick — called every second
+  // Game tick
   tick: () => {
+    if (get().gameOver) return
     set((s) => {
       let newEvents = [...s.events]
       const newResources = { ...s.resources }
       const popups = []
+      let newNodes = [...s.nodes]
 
-      // --- Mood drift for villagers ---
       const newVillagers = s.villagers.map((v) => {
         let updated = { ...v }
 
-        // Rest timer countdown
         if (updated.restTimer > 0) {
           updated.restTimer -= 1
           if (updated.restTimer <= 0) {
@@ -370,11 +583,9 @@ const useStore = create((set, get) => ({
           }
         }
 
-        // Mood timer countdown
         updated.moodTimer -= 1
         if (updated.moodTimer <= 0 && updated.restTimer <= 0) {
           const newMood = rollMoodShift(updated.personality)
-          // If rolling feuding, pick a random feud target
           if (newMood === 'feuding' && s.villagers.length > 1) {
             const others = s.villagers.filter((o) => o.id !== v.id)
             updated.feudTarget = others[Math.floor(Math.random() * others.length)].id
@@ -382,16 +593,14 @@ const useStore = create((set, get) => ({
             updated.feudTarget = null
           }
           updated.mood = newMood
-          updated.moodTimer = 20 + Math.floor(Math.random() * 20) // 20-40 ticks
+          updated.moodTimer = 20 + Math.floor(Math.random() * 20)
         }
 
-        // Walk progress toward target (building or home)
         if (updated.targetX !== null && updated.targetY !== null && updated.walkProgress < 1) {
           const speed = MOODS[updated.mood]?.buildSpeed || 1.0
           updated.walkProgress = Math.min(1, updated.walkProgress + 0.1 * speed)
 
-          // If walking home (no building assignment) and arrived, snap to home
-          if (updated.walkProgress >= 1 && !updated.assignedBuildingId) {
+          if (updated.walkProgress >= 1 && !updated.assignedBuildingId && !updated.assignedNodeId) {
             updated.x = updated.targetX
             updated.y = updated.targetY
             updated.targetX = null
@@ -399,16 +608,57 @@ const useStore = create((set, get) => ({
           }
         }
 
+        if (updated.assignedNodeId && updated.walkProgress >= 1) {
+          const node = newNodes.find(n => n.id === updated.assignedNodeId)
+          if (node && node.remainingAmount > 0) {
+            if (!updated._harvestTimer || updated._harvestTimer <= 0) {
+              const typeDef = NODE_TYPES[node.type]
+              const harvestAmount = typeDef.amountPerHarvest
+              const actualHarvest = Math.min(harvestAmount, node.remainingAmount)
+              
+              node.remainingAmount -= actualHarvest
+              newResources[typeDef.resource] += actualHarvest
+              popups.push({ resource: typeDef.resource, amount: actualHarvest, nodeId: node.id })
+              
+              updated._harvestTimer = 5
+              
+              if (node.remainingAmount <= 0) {
+                const chronicle = `${updated.name} has exhausted the ${typeDef.name}.`
+                newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+                updated.assignedNodeId = null
+                updated.targetX = updated.homeX
+                updated.targetY = updated.homeY
+                updated.walkProgress = 0
+              }
+            } else {
+              updated._harvestTimer -= 1
+            }
+          } else if (node && node.remainingAmount <= 0) {
+             updated.assignedNodeId = null
+             updated.targetX = updated.homeX
+             updated.targetY = updated.homeY
+             updated.walkProgress = 0
+          }
+        }
+
         return updated
       })
 
-      // --- Building logic ---
+      const newGrid = { ...s.grid }
+      Object.keys(newGrid).forEach(key => {
+        const val = newGrid[key]
+        if (typeof val === 'string' && val.startsWith('node-')) {
+          const id = parseInt(val.split('-')[1])
+          const node = newNodes.find(n => n.id === id)
+          if (!node || node.remainingAmount <= 0) delete newGrid[key]
+        }
+      })
+      newNodes = newNodes.filter(n => n.remainingAmount > 0)
+
       const newBuildings = s.buildings.map((b) => {
-        // Check if assigned villager has arrived (walkProgress >= 1) → start building
         if (b.status === 'assigned' && b.assignedVillager) {
           const worker = newVillagers.find((v) => v.id === b.assignedVillager)
           if (worker && worker.walkProgress >= 1) {
-            // Snap worker to their target (adjacent cell, NOT on the building)
             worker.x = worker.targetX
             worker.y = worker.targetY
             worker.targetX = null
@@ -419,12 +669,10 @@ const useStore = create((set, get) => ({
         }
 
         if (b.status === 'building') {
-          // Use mood-based build speed
           const worker = newVillagers.find((v) => v.id === b.assignedVillager)
           const decrement = worker ? getBuildDecrement(worker.mood) : 1
           const newTimer = b.timer - decrement
           if (newTimer <= 0) {
-            // Building completed
             const def = BUILDINGS[b.type]
             const workerMood = worker?.mood || 'happy'
             const chronicle = getMoodChronicle('completion_' + workerMood, {
@@ -438,17 +686,6 @@ const useStore = create((set, get) => ({
               ]
             }
 
-            // Check milestones
-            const activeCount = s.buildings.filter((x) => x.status === 'active').length + 1
-            if (activeCount === 5) {
-              const m = getRandomChronicle('milestone_5')
-              if (m) newEvents = [...newEvents, { id: nextEventId++, text: m, timestamp: Date.now() }]
-            } else if (activeCount === 10) {
-              const m = getRandomChronicle('milestone_10')
-              if (m) newEvents = [...newEvents, { id: nextEventId++, text: m, timestamp: Date.now() }]
-            }
-
-            // Free up the worker — send them walking back home
             if (worker) {
               worker.assignedBuildingId = null
               worker.targetX = worker.homeX
@@ -457,18 +694,13 @@ const useStore = create((set, get) => ({
             }
 
             playBuildComplete()
-
-            if (def?.special === 'trade_boost') {
-              return { ...b, status: 'active', timer: 0, assignedVillager: null, boostReady: true }
-            }
-            return { ...b, status: 'active', timer: 0, assignedVillager: null }
+            return { ...b, status: 'active', timer: 0, assignedVillager: null, boostReady: def?.special === 'trade_boost' }
           }
           return { ...b, timer: newTimer }
         }
         return b
       })
 
-      // --- Produce resources from active buildings ---
       const happiness = getVillageHappiness(newVillagers)
       const eventMultiplier = s.activeRandomEvent ? (RANDOM_EVENTS[s.activeRandomEvent]?.multiplier || 1) : 1
       const multiplier = (s.tradeBoostActive ? 2 : 1) * eventMultiplier
@@ -494,15 +726,263 @@ const useStore = create((set, get) => ({
           }
         }
       })
-      if (blueprintTick) {
-        newResources.blueprints = (newResources.blueprints || 0) + 1
+      if (blueprintTick) newResources.blueprints = (newResources.blueprints || 0) + 1
+
+      // Population Cap logic (uses newBuildings/newVillagers before combat filtering)
+      const activeHousing = newBuildings.filter(b => b.status === 'active' && BUILDINGS[b.type].special === 'housing')
+      const maxPop = 3 + activeHousing.reduce((acc, b) => acc + (BUILDINGS[b.type].capacity || 0), 0)
+      const currentPop = newVillagers.length
+
+      // Overcrowding mood penalty: when population exceeds housing cap, villagers get stressed
+      if (currentPop > maxPop) {
+        newVillagers.forEach((v) => {
+          if (v.restTimer > 0) return
+          // Drain mood timer 3x faster so moods shift to negative sooner
+          v.moodTimer = Math.max(0, v.moodTimer - 2)
+          // If already at a neutral/positive mood, nudge toward tired
+          if (v.mood === 'happy' && v.moodTimer <= 0) {
+            v.mood = 'tired'
+            v.moodTimer = 10
+          }
+        })
+        // Fire chronicle once when overcrowding starts
+        if (currentPop > maxPop && s.villagers.length <= s.maxPopulation) {
+          const chronicle = 'The village grows cramped! Citizens grumble about the lack of housing.'
+          newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+        }
       }
 
-      // Population = base 3 villagers + 2 per active building
-      const activeCount = newBuildings.filter((b) => b.status === 'active').length
-      const population = 3 + activeCount * 2
+      // --- Combat & Threat (Phase 4) ---
+      let activeBuildings = newBuildings.filter(b => b.status === 'active')
+      const steamProduction = activeBuildings.reduce((acc, b) => acc + (BUILDINGS[b.type].produces?.steam || 0), 0)
+      let threatMeter = Math.min(100, s.threatMeter + steamProduction * 0.05 + 0.1)
+      let newEnemies = [...s.enemies]
 
-      // Trade boost timer
+      if (threatMeter >= 100) {
+        threatMeter = 0
+        const chronicle = "ALARM! Raiders have been spotted approaching from the wastes!"
+        newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+        const distPlot = s.unlockedPlots[Math.floor(Math.random()*s.unlockedPlots.length)]
+        const ex = distPlot.x * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
+        const ey = distPlot.y * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
+        newEnemies.push({
+          id: Date.now(), x: ex, y: ey, targetX: 4, targetY: 4, health: 50, maxHealth: 50, type: 'raider', speed: 0.05
+        })
+      }
+
+      // Watchtower slow: enemies in range of a watchtower move at half speed
+      const watchtowers = activeBuildings.filter(b => BUILDINGS[b.type].special === 'vision')
+
+      newEnemies = newEnemies.map(e => {
+        const dx = e.targetX - e.x, dy = e.targetY - e.y
+        const dist = Math.sqrt(dx*dx + dy*dy)
+        if (dist > 0.2) {
+          let speed = e.speed
+          // Check watchtower slow
+          for (const wt of watchtowers) {
+            const wtDist = Math.sqrt(Math.pow(e.x - wt.gridX, 2) + Math.pow(e.y - wt.gridY, 2))
+            if (wtDist <= (BUILDINGS[wt.type].range || 6)) {
+              speed *= 0.5
+              break
+            }
+          }
+          return { ...e, x: e.x + (dx/dist)*speed, y: e.y + (dy/dist)*speed }
+        }
+        return e
+      })
+
+      // Tesla towers zap enemies
+      const teslaTowers = activeBuildings.filter(b => BUILDINGS[b.type].special === 'defense')
+      teslaTowers.forEach(t => {
+        const def = BUILDINGS[t.type]
+        newEnemies.forEach(e => {
+          const dist = Math.sqrt(Math.pow(e.x - t.gridX, 2) + Math.pow(e.y - t.gridY, 2))
+          if (dist <= (def.range || 3)) {
+             e.health -= (def.damage || 5)
+             if (e.health <= 0) {
+                popups.push({ resource: 'crystals', amount: 5, nodeId: 'enemy-' + e.id })
+                newResources.crystals += 5
+             }
+          }
+        })
+      })
+
+      // Enemies attack nearest building when they arrive (dist <= 0.2 to target)
+      newEnemies.forEach(e => {
+        const dx = e.targetX - e.x, dy = e.targetY - e.y
+        const distToTarget = Math.sqrt(dx*dx + dy*dy)
+        if (distToTarget <= 0.2) {
+          // Find nearest active building within 1.5 range
+          let closestBldg = null
+          let closestDist = Infinity
+          newBuildings.forEach(b => {
+            if (b.status !== 'active' && b.status !== 'building') return
+            const bd = Math.sqrt(Math.pow(e.x - b.gridX, 2) + Math.pow(e.y - b.gridY, 2))
+            if (bd < closestDist && bd <= 1.5) {
+              closestDist = bd
+              closestBldg = b
+            }
+          })
+          if (closestBldg) {
+            closestBldg.health -= 5
+            if (closestBldg.health <= 0) {
+              closestBldg.health = 0
+              closestBldg.status = 'destroyed'
+              const def = BUILDINGS[closestBldg.type]
+              const chronicle = `Devastation! The ${def?.name || closestBldg.type} has been reduced to rubble by raiders!`
+              newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+              // Free the grid cell
+              const key = `${closestBldg.gridX},${closestBldg.gridY}`
+              delete newGrid[key]
+              // Unassign worker
+              if (closestBldg.assignedVillager) {
+                const worker = newVillagers.find(v => v.id === closestBldg.assignedVillager)
+                if (worker) {
+                  worker.assignedBuildingId = null
+                  worker.targetX = worker.homeX
+                  worker.targetY = worker.homeY
+                  worker.walkProgress = 0
+                }
+              }
+              // Retarget enemy to next nearest building
+              let nextBldg = null
+              let nextDist = Infinity
+              newBuildings.forEach(b => {
+                if (b.id === closestBldg.id || (b.status !== 'active' && b.status !== 'building')) return
+                const bd = Math.sqrt(Math.pow(e.x - b.gridX, 2) + Math.pow(e.y - b.gridY, 2))
+                if (bd < nextDist) { nextDist = bd; nextBldg = b }
+              })
+              if (nextBldg) {
+                e.targetX = nextBldg.gridX
+                e.targetY = nextBldg.gridY
+              }
+            }
+          }
+        }
+      })
+
+      // Enemies fight back: damage ANY villager within 1.5 range
+      newEnemies.forEach(e => {
+        newVillagers.forEach(v => {
+          const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
+          if (dist <= 1.5) {
+            v.health -= 1
+            // Non-militia flee
+            if (!v.isMilitia && !v.assignedBuildingId && !v.assignedNodeId) {
+              v.targetX = v.homeX
+              v.targetY = v.homeY
+              v.walkProgress = 0
+            }
+          }
+        })
+      })
+
+      // Militia Attack and Pillage logic
+      const outposts = newNodes.filter(n => n.type === 'OUTPOST')
+      outposts.forEach(outpost => {
+        const villagersAtOutpost = newVillagers.filter(v => v.assignedNodeId === outpost.id && v.walkProgress >= 1)
+        if (villagersAtOutpost.length >= 3) {
+          outpost.remainingAmount -= villagersAtOutpost.length * 2
+          if (outpost.remainingAmount <= 0) {
+            newResources.crystals += 100
+            newResources.blueprints += 10
+            popups.push({ resource: 'crystals', amount: 100, nodeId: outpost.id })
+            popups.push({ resource: 'blueprints', amount: 10, nodeId: outpost.id })
+            const chronicle = "Victory! Our brave pioneers have razed a raider outpost and returned with spoils!"
+            newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+          }
+        }
+      })
+
+      // Militia auto-pursue nearest enemy
+      newVillagers.forEach(v => {
+        if (!v.isMilitia) return
+        if (v.assignedBuildingId || v.assignedNodeId) return
+        if (newEnemies.length === 0) return
+        // Find nearest enemy
+        let nearest = null
+        let nearestDist = Infinity
+        newEnemies.forEach(e => {
+          const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
+          if (dist < nearestDist) { nearestDist = dist; nearest = e }
+        })
+        if (nearest && nearestDist > 1.5) {
+          // Move toward enemy
+          const dx = nearest.x - v.x
+          const dy = nearest.y - v.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          const speed = 0.15
+          v.x = v.x + (dx / dist) * speed
+          v.y = v.y + (dy / dist) * speed
+        }
+      })
+
+      // Militia deal damage to nearby enemies
+      newVillagers.forEach(v => {
+        if (v.isMilitia) {
+          let inCombat = false
+          newEnemies.forEach(e => {
+            const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
+            if (dist <= 1.5) {
+              e.health -= 2
+              inCombat = true
+            }
+          })
+          // Passive regen: militia not in combat regen 1 HP/tick
+          if (!inCombat && v.health < v.maxHealth) {
+            v.health = Math.min(v.maxHealth, v.health + 1)
+          }
+        }
+        // Resting villagers regen 5 HP/tick
+        if (v.restTimer > 0 && v.health < v.maxHealth) {
+          v.health = Math.min(v.maxHealth, v.health + 5)
+        }
+      })
+
+      newEnemies = newEnemies.filter(e => e.health > 0)
+
+      // Remove dead villagers
+      const deadVillagers = newVillagers.filter(v => v.health <= 0)
+      deadVillagers.forEach(v => {
+        const chronicle = `${v.name} has fallen in battle!`
+        newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+        // Free grid cell if assigned
+        if (v.assignedBuildingId) {
+          const bldg = newBuildings.find(b => b.id === v.assignedBuildingId)
+          if (bldg) bldg.assignedVillager = null
+        }
+      })
+
+      // Filter out destroyed buildings and dead villagers
+      const aliveVillagers = newVillagers.filter(v => v.health > 0)
+      const standingBuildings = newBuildings.filter(b => b.status !== 'destroyed')
+
+      // Game over check: all villagers dead
+      let gameOver = s.gameOver
+      if (aliveVillagers.length === 0 && s.villagers.length > 0) {
+        gameOver = true
+      }
+
+      // Update active buildings list for resource production recalc
+      activeBuildings = standingBuildings.filter(b => b.status === 'active')
+
+      // Wanderer logic
+      let wandererTimer = s.wandererTimer - 1
+      let pendingWanderer = s.pendingWanderer
+      if (wandererTimer <= 0) {
+        wandererTimer = 60
+        if (currentPop < maxPop && happiness > 50 && !pendingWanderer) {
+           pendingWanderer = {
+            id: Date.now(),
+            name: 'Wanderer ' + (currentPop + 1),
+            personality: ['diligent', 'lazy', 'hothead', 'cheerful'][Math.floor(Math.random() * 4)],
+            mood: 'happy'
+          }
+          const chronicle = `A weary traveler named ${pendingWanderer.name} waits at the gates.`
+          newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+        }
+      }
+
       let tradeBoostActive = s.tradeBoostActive
       let tradeBoostTimer = s.tradeBoostTimer
       if (tradeBoostActive) {
@@ -513,7 +993,6 @@ const useStore = create((set, get) => ({
         }
       }
 
-      // Random event timer
       let activeRandomEvent = s.activeRandomEvent
       let randomEventTimer = s.randomEventTimer
       if (activeRandomEvent) {
@@ -524,12 +1003,10 @@ const useStore = create((set, get) => ({
         }
       }
 
-      // Roll for new random events (only when none active, ~every tick with low chance)
       if (!activeRandomEvent) {
         const eventKey = rollRandomEvent(happiness)
         if (eventKey) {
           const evt = RANDOM_EVENTS[eventKey]
-          // Handle feud outbreak
           if (eventKey === 'feud_outbreak' && newVillagers.length >= 2) {
             const shuffled = [...newVillagers].sort(() => Math.random() - 0.5)
             shuffled[0].mood = 'feuding'
@@ -538,69 +1015,60 @@ const useStore = create((set, get) => ({
             shuffled[1].feudTarget = shuffled[0].id
             shuffled[0].moodTimer = 30
             shuffled[1].moodTimer = 30
-            const chronicle = getMoodChronicle('feud', {
-              villager: shuffled[0].name,
-              target: shuffled[1].name,
-            })
-            if (chronicle) {
-              newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
-            }
+            const chronicle = getMoodChronicle('feud', { villager: shuffled[0].name, target: shuffled[1].name })
+            if (chronicle) newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
             playRandomEvent()
           } else if (eventKey === 'morale_boost') {
-            // Boost all moods to happy
-            newVillagers.forEach((v) => {
-              v.mood = 'happy'
-              v.feudTarget = null
-              v.moodTimer = 30
-            })
+            newVillagers.forEach((v) => { v.mood = 'happy'; v.feudTarget = null; v.moodTimer = 30 })
             const chronicle = getMoodChronicle('random_event', { event: evt.label })
-            if (chronicle) {
-              newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
-            }
+            if (chronicle) newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
             playRandomEvent()
           } else if (evt.duration > 0) {
             activeRandomEvent = eventKey
             randomEventTimer = evt.duration
             const chronicle = getMoodChronicle('random_event', { event: evt.label })
-            if (chronicle) {
-              newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
-            }
+            if (chronicle) newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
             playRandomEvent()
           }
         }
       }
 
       return {
-        buildings: newBuildings,
-        villagers: newVillagers,
+        buildings: standingBuildings,
+        villagers: aliveVillagers,
         resources: newResources,
         events: newEvents,
+        nodes: newNodes,
+        grid: newGrid,
+        enemies: newEnemies,
+        threatMeter,
         tradeBoostActive,
         tradeBoostTimer,
         resourcePopups: popups,
-        population,
+        population: aliveVillagers.length,
+        maxPopulation: maxPop,
         villageHappiness: happiness,
         activeRandomEvent,
         randomEventTimer,
+        wandererTimer,
+        pendingWanderer,
+        gameOver,
       }
     })
   },
 
-  // Activate trade boost from airship dock
+  // Activate trade boost
   activateTradeBoost: () => {
     set({ tradeBoostActive: true, tradeBoostTimer: 30 })
     const chronicle = getRandomChronicle('trade_boost')
     if (chronicle) {
       set((s) => ({
-        events: [
-          ...s.events,
-          { id: nextEventId++, text: chronicle, timestamp: Date.now() },
-        ],
+        events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }],
       }))
     }
   },
 
-  // Upgrade a building (costs blueprints, increases level)
+  // Upgrade building
   upgradeBuilding: (buildingId) => {
     const state = get()
     const building = state.buildings.find((b) => b.id === buildingId)
@@ -609,20 +1077,122 @@ const useStore = create((set, get) => ({
     if (state.resources.blueprints < cost) return false
 
     set((s) => ({
-      buildings: s.buildings.map((b) =>
-        b.id === buildingId ? { ...b, level: b.level + 1 } : b
-      ),
+      buildings: s.buildings.map((b) => b.id === buildingId ? { ...b, level: b.level + 1 } : b),
       resources: { ...s.resources, blueprints: s.resources.blueprints - cost },
     }))
     playUpgrade()
     return true
   },
 
+  // Accept a wanderer
+  acceptWanderer: () => {
+    const state = get()
+    if (!state.pendingWanderer) return false
+    
+    const w = state.pendingWanderer
+    const newVillager = {
+      ...w,
+      role: 'Wanderer',
+      x: 0, y: 0,
+      homeX: 0, homeY: 0,
+      moodTimer: 30,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
+      targetX: 2 + Math.floor(Math.random()*4), targetY: 2 + Math.floor(Math.random()*4), 
+      walkProgress: 0,
+      negotiationCount: 0, restTimer: 0,
+      health: 100, maxHealth: 100, isMilitia: false,
+    }
+    newVillager.homeX = newVillager.targetX
+    newVillager.homeY = newVillager.targetY
+
+    set((s) => ({
+      villagers: [...s.villagers, newVillager],
+      pendingWanderer: null,
+      events: [...s.events, { id: nextEventId++, text: `${w.name} has joined us!`, timestamp: Date.now() }]
+    }))
+    return true
+  },
+
+  rejectWanderer: () => {
+    set({ pendingWanderer: null })
+  },
+
+  // Unlock plot
+  unlockPlot: (px, py) => {
+    const state = get()
+    if (state.unlockedPlots.some(p => p.x === px && p.y === py)) return false
+    if (state.resources.steam < 50 || state.resources.blueprints < 5) return false
+
+    set((s) => ({
+      unlockedPlots: [...s.unlockedPlots, { x: px, y: py }],
+      resources: { ...s.resources, steam: s.resources.steam - 50, blueprints: s.resources.blueprints - 5 }
+    }))
+    get().spawnNodes(px, py, 4)
+    return true
+  },
+
+  getAvailablePlots: () => {
+    const state = get()
+    const available = []
+    const directions = [{dx:1, dy:0}, {dx:-1, dy:0}, {dx:0, dy:1}, {dx:0, dy:-1}]
+    state.unlockedPlots.forEach(p => {
+      directions.forEach(d => {
+        const nx = p.x + d.dx, ny = p.y + d.dy
+        if (!state.unlockedPlots.some(up => up.x === nx && up.y === ny) && !available.some(a => a.x === nx && a.y === ny)) {
+          available.push({ x: nx, y: ny })
+        }
+      })
+    })
+    return available
+  },
+
+  // Draft a villager into the militia
+  draftMilitia: (villagerId) => {
+    const state = get()
+    const villager = state.villagers.find(v => v.id === villagerId)
+    if (!villager) return false
+    const wasMilitia = villager.isMilitia
+
+    // When un-drafting, clear assignments and send home
+    if (wasMilitia && (villager.assignedBuildingId || villager.assignedNodeId)) {
+      get().unassignVillager(villagerId)
+    }
+
+    set((s) => ({
+      villagers: s.villagers.map(v => v.id === villagerId ? { ...v, isMilitia: !v.isMilitia } : v)
+    }))
+    return true
+  },
+
+  spawnEnemy: (px, py) => {
+    const id = Date.now()
+    const enemy = {
+      id,
+      x: px * PLOT_SIZE,
+      y: py * PLOT_SIZE,
+      targetX: 4, targetY: 4, // Target village center
+      health: 50,
+      maxHealth: 50,
+      type: 'raider',
+      speed: 0.05
+    }
+    set((s) => ({ enemies: [...s.enemies, enemy] }))
+  },
+
   // UI actions
-  selectCell: (x, y) => set({ selectedCell: { x, y }, showBuildMenu: true, selectedBuilding: null }),
-  selectBuilding: (id) => set({ selectedBuilding: id, showBuildMenu: false, selectedCell: null }),
+  selectCell: (x, y) => {
+    const state = get()
+    const key = `${x},${y}`
+    const cell = state.grid[key]
+    if (typeof cell === 'string' && cell.startsWith('node-')) {
+       set({ selectedNode: parseInt(cell.split('-')[1]), selectedBuilding: null, selectedCell: {x, y}, showBuildMenu: false })
+    } else {
+       set({ selectedCell: { x, y }, showBuildMenu: true, selectedBuilding: null, selectedNode: null })
+    }
+  },
+  selectBuilding: (id) => set({ selectedBuilding: id, showBuildMenu: false, selectedCell: null, selectedNode: null }),
   closeBuildMenu: () => set({ showBuildMenu: false, selectedCell: null }),
-  closeInfo: () => set({ selectedBuilding: null }),
+  closeInfo: () => set({ selectedBuilding: null, selectedNode: null }),
   openChat: (villagerId) => set({ chatTarget: villagerId }),
   closeChat: () => set({ chatTarget: null }),
 }))
