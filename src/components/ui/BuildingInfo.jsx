@@ -14,6 +14,9 @@ export default function BuildingInfo() {
   const openChat = useStore((s) => s.openChat)
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
   const blueprints = useStore((s) => s.resources.blueprints)
+  const getAvailablePlots = useStore((s) => s.getAvailablePlots)
+  const unlockPlot = useStore((s) => s.unlockPlot)
+  const steam = useStore((s) => s.resources.steam)
 
   const building = buildings.find((b) => b.id === selectedBuildingId)
   const def = building ? BUILDINGS[building.type] : null
@@ -23,8 +26,17 @@ export default function BuildingInfo() {
   const assignedWorker = building?.assignedVillager
     ? villagers.find((v) => v.id === building.assignedVillager)
     : null
-  const availableWorkers = villagers.filter((v) => !v.assignedBuildingId)
-  const allWorkersBusy = availableWorkers.length === 0
+  const sortedWorkers = [...villagers]
+    .filter((v) => v.restTimer <= 0)
+    .sort((a, b) => {
+      const aFree = !a.assignedBuildingId && !a.assignedNodeId ? 0 : 1
+      const bFree = !b.assignedBuildingId && !b.assignedNodeId ? 0 : 1
+      return aFree - bFree
+    })
+  const allWorkersBusy = sortedWorkers.length === 0
+
+  const availablePlots = def?.special === 'explorer' ? getAvailablePlots() : []
+  const canAffordSurvey = steam >= 50 && blueprints >= 5
 
   function handleAssign(villagerId) {
     if (!building) return
@@ -80,7 +92,11 @@ export default function BuildingInfo() {
                 {def.type === 'clockwork_forge' ? '⚒️' : 
                  def.type === 'steam_mill' ? '💨' :
                  def.type === 'crystal_refinery' ? '💎' :
-                 def.type === 'airship_dock' ? '⚓' : '⚙️'}
+                 def.type === 'airship_dock' ? '⚓' : 
+                 def.type === 'explorers_guild' ? '🧭' :
+                 def.type === 'cottage' ? '🏠' :
+                 def.type === 'tesla_tower' ? '⚡' :
+                 def.type === 'watchtower' ? '🔭' : '⚙️'}
               </div>
               <div>
                 <h3 className="font-uncial text-xl text-amber-400">{def.name}</h3>
@@ -151,20 +167,59 @@ export default function BuildingInfo() {
                  <p className="text-xs text-red-500 font-bold italic">Critical: No Available Personnel</p>
                ) : (
                  <div className="space-y-2">
-                   {availableWorkers.map((v) => (
-                     <button
-                       key={v.id}
-                       onClick={() => handleAssign(v.id)}
-                       className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border border-zinc-800 hover:border-blue-500 transition-all text-left group"
-                     >
-                       <span className="text-xs font-medieval text-zinc-300 group-hover:text-blue-200">{v.name}</span>
-                       <span className="text-[10px] font-black uppercase" style={{ color: MOODS[v.mood]?.color }}>
-                         {MOODS[v.mood]?.label}
-                       </span>
-                     </button>
-                   ))}
+                   {sortedWorkers.map((v) => {
+                     const assignedBuilding = v.assignedBuildingId ? buildings.find(b => b.id === v.assignedBuildingId) : null
+                     const assignedNode = v.assignedNodeId ? true : null
+                     const isBusy = !!(assignedBuilding || assignedNode)
+                     const taskLabel = assignedBuilding
+                       ? BUILDINGS[assignedBuilding.type]?.name || 'Building'
+                       : assignedNode ? 'Harvesting' : null
+
+                     return (
+                       <button
+                         key={v.id}
+                         onClick={() => handleAssign(v.id)}
+                         className={`w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border transition-all text-left group ${
+                           isBusy ? 'border-zinc-800/50 hover:border-amber-600' : 'border-zinc-800 hover:border-blue-500'
+                         }`}
+                       >
+                         <div className="flex items-center gap-2 min-w-0">
+                           <span className={`text-xs font-medieval truncate ${isBusy ? 'text-zinc-500 group-hover:text-amber-300' : 'text-zinc-300 group-hover:text-blue-200'}`}>
+                             {v.name}
+                           </span>
+                           {taskLabel && (
+                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-800/40 text-amber-500 uppercase font-black tracking-tighter shrink-0">
+                               {taskLabel}
+                             </span>
+                           )}
+                         </div>
+                         <span className="text-[10px] font-black uppercase shrink-0 ml-2" style={{ color: MOODS[v.mood]?.color }}>
+                           {MOODS[v.mood]?.label}
+                         </span>
+                       </button>
+                     )
+                   })}
                  </div>
                )}
+            </div>
+          )}
+
+          {def.special === 'explorer' && building.status === 'active' && (
+            <div className="mb-6">
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3 text-emerald-500/80">Available Survey Sites (50 Steam, 5 Blueprints):</p>
+              <div className="max-h-32 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                {availablePlots.map((p) => (
+                  <button
+                    key={`${p.x},${p.y}`}
+                    onClick={() => unlockPlot(p.x, p.y)}
+                    disabled={!canAffordSurvey}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-emerald-950/20 border border-emerald-900/30 hover:border-emerald-500 transition-all text-left group disabled:opacity-50 disabled:grayscale"
+                  >
+                    <span className="text-xs font-medieval text-emerald-100 group-hover:text-emerald-300">Plot [{p.x}, {p.y}]</span>
+                    <span className="text-[10px] font-black uppercase text-emerald-600">Reclaim Land</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
