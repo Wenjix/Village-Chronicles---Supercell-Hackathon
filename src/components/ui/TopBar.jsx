@@ -2,15 +2,10 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { RANDOM_EVENTS } from '../../data/moods'
+import panelTextureUrl from '../../UITextures/panel-003.png'
+import panelBorderUrl from '../../UITextures/panel-transparent-border-002.png'
 
-const GAUGE_TINTS = {
-  gears: 'border-amber-800/30 bg-amber-950/20',
-  steam: 'border-zinc-700/30 bg-zinc-900/20',
-  crystals: 'border-purple-800/30 bg-purple-950/20',
-  blueprints: 'border-blue-800/30 bg-blue-950/20',
-}
-
-function ResourceDisplay({ label, value, icon, glowClass, prevValue, gaugeClass }) {
+function ResourceChip({ label, value, icon, glowClass, prevValue, borderClass, isRare = false }) {
   const [diff, setDiff] = useState(null)
 
   useEffect(() => {
@@ -25,20 +20,26 @@ function ResourceDisplay({ label, value, icon, glowClass, prevValue, gaugeClass 
   }, [value, prevValue])
 
   return (
-    <div className={`resource-gauge ${gaugeClass} flex items-center gap-1 sm:gap-2 relative`}>
-      <span className="text-sm sm:text-lg">{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider hidden sm:block">{label}</span>
-        <span className={`text-sm sm:text-lg font-bold ${glowClass}`}>{Math.floor(value)}</span>
+    <div
+      className={`relative flex items-center gap-3 px-4 py-2 border-b-2 border-r-2 ${borderClass} bg-black/40 min-w-[100px] shadow-[inset_0_0_15px_rgba(0,0,0,0.6)] transition-all hover:bg-black/60`}
+    >
+      <span className="text-2xl leading-none shrink-0 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)]">{icon}</span>
+      <div className="flex flex-col min-w-0 leading-tight">
+        <span className={`text-[11px] uppercase tracking-[0.15em] font-medieval truncate drop-shadow-sm font-bold ${isRare ? 'text-amber-400' : 'text-zinc-500'}`}>
+          {label}
+        </span>
+        <span className={`text-xl font-typewriter tabular-nums leading-none ${glowClass} drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]`}>
+          {Math.floor(value)}
+        </span>
       </div>
       <AnimatePresence>
         {diff && (
           <motion.span
             initial={{ opacity: 1, y: 0 }}
-            animate={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 0, y: -30 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8 }}
-            className={`absolute -top-3 right-0 text-sm font-bold ${glowClass}`}
+            className={`absolute -top-6 right-2 text-sm font-typewriter font-black ${glowClass} drop-shadow-[0_0_6px_rgba(0,0,0,0.9)]`}
           >
             {diff}
           </motion.span>
@@ -63,6 +64,27 @@ function getHappinessColor(happiness) {
   return 'text-red-400'
 }
 
+function StatusSlot({ active, className, children }) {
+  return (
+    <div className="relative h-6 w-[140px]">
+      <AnimatePresence>
+        {active && (
+          <motion.div
+            key="active"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2 }}
+            className={`absolute inset-0 px-2.5 py-1 rounded-sm border text-[10px] font-black shadow-xl flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis ${className}`}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export default function TopBar() {
   const resources = useStore((s) => s.resources)
   const buildings = useStore((s) => s.buildings)
@@ -71,7 +93,6 @@ export default function TopBar() {
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
   const tradeBoostTimer = useStore((s) => s.tradeBoostTimer)
   const villageHappiness = useStore((s) => s.villageHappiness)
-  const threatMeter = useStore((s) => s.threatMeter)
   const activeRandomEvent = useStore((s) => s.activeRandomEvent)
   const randomEventTimer = useStore((s) => s.randomEventTimer)
   const [prev, setPrev] = useState(resources)
@@ -90,99 +111,65 @@ export default function TopBar() {
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
       style={{ zIndex: 120 }}
-      className="fixed top-0 left-0 right-0 px-6 py-2 flex items-center justify-between pointer-events-none"
+      className="fixed top-0 left-0 right-0 px-4 py-2 pointer-events-none"
     >
-      {/* Decorative Brass Bar */}
-      <div className="absolute inset-0 h-16 bg-black/80 border-b-4 border-brass-dim/50 shadow-2xl pointer-events-auto" />
-      
-      {/* Left: Title & Population */}
-      <div className="relative flex items-center gap-6 pointer-events-auto">
-        <div className="flex flex-col">
-          <span className="font-uncial text-2xl text-amber-400 drop-shadow-md leading-tight">
+      <div className="relative pointer-events-auto flex items-center gap-8 h-[80px]">
+        {/* Left: Title & Pop */}
+        <div className="flex flex-col shrink-0 pl-4">
+          <span className="font-uncial text-2xl text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] leading-none tracking-tight">
             Village Chronicles
           </span>
-          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-amber-600/80 font-bold">
-            <span className="flex items-center gap-1">👥 {population}/{maxPopulation} citizens</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">{activeBuildings} structures</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Center: Resource Dashboard */}
-      <div className="relative flex items-center gap-0.5 bg-black/40 rounded-lg p-1 border border-brass-dim/30 shadow-inner">
-        {/* Raw Resources */}
-        <ResourceDisplay label="Wood" value={resources.wood} prevValue={prev.wood || 0} icon="🪵" glowClass="text-amber-600" gaugeClass="border-amber-900/40 bg-amber-950/30" />
-        <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay label="Stone" value={resources.stone} prevValue={prev.stone || 0} icon="🪨" glowClass="text-stone-400" gaugeClass="border-stone-700/40 bg-stone-900/30" />
-        <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay label="Metal" value={resources.metal} prevValue={prev.metal || 0} icon="🔩" glowClass="text-slate-300" gaugeClass="border-slate-700/40 bg-slate-900/30" />
-        <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay label="Water" value={resources.water} prevValue={prev.water || 0} icon="💧" glowClass="text-cyan-400" gaugeClass="border-cyan-700/40 bg-cyan-900/30" />
-
-        {/* Divider between raw and refined */}
-        <div className="w-0.5 h-10 bg-brass-dim/40 self-center mx-1" />
-
-        {/* Refined Resources */}
-        <ResourceDisplay label="Gears" value={resources.gears} prevValue={prev.gears} icon="⚙️" glowClass="resource-glow-gears text-amber-400" gaugeClass="border-amber-900/40 bg-amber-950/30" />
-        <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay label="Steam" value={resources.steam} prevValue={prev.steam} icon="💨" glowClass="resource-glow-steam text-zinc-300" gaugeClass="border-zinc-700/40 bg-zinc-900/30" />
-        <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay label="Crystals" value={resources.crystals} prevValue={prev.crystals} icon="💎" glowClass="resource-glow-crystals text-purple-400" gaugeClass="border-purple-800/40 bg-purple-950/30" />
-        {resources.blueprints > 0 && (
-          <>
-            <div className="w-px h-8 bg-brass-dim/20 self-center" />
-            <ResourceDisplay label="Blueprints" value={resources.blueprints} prevValue={prev.blueprints || 0} icon="📜" glowClass="text-blue-400" gaugeClass="border-blue-800/40 bg-blue-950/30" />
-          </>
-        )}
-      </div>
-
-      {/* Right: Happiness & Events */}
-      <div className="relative flex items-center gap-6">
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] uppercase tracking-wider text-red-500 font-bold">Steam Pressure (Threat)</span>
-          <div className="w-24 h-2 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
-            <motion.div 
-              className="h-full bg-red-500"
-              initial={{ width: 0 }}
-              animate={{ width: `${threatMeter}%` }}
-            />
+          <div className="mt-1.5 flex items-center gap-2.5 text-[11px] uppercase tracking-[0.2em] text-amber-600 font-black">
+            <span>👥 {population}/{maxPopulation}</span>
+            <span className="opacity-40">|</span>
+            <span>{activeBuildings} active</span>
           </div>
         </div>
 
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Village Harmony</span>
-          <div className={`flex items-center gap-2 font-medieval text-lg ${getHappinessColor(villageHappiness)}`}>
-            {getHappinessEmoji(villageHappiness)} {villageHappiness}%
+        {/* Center: Resources - unified group */}
+        <div
+          className="relative flex-1 min-w-0 brass-bezel px-4 py-1.5 overflow-hidden flex items-center justify-center"
+          data-tutorial="topbar-resources"
+        >
+          <div className="absolute inset-0 opacity-10 pointer-events-none bg-black/40" />
+          <div className="absolute inset-0 opacity-15 pointer-events-none" style={{ backgroundImage: `url(${panelBorderUrl})`, backgroundSize: '100% 100%' }} />
+          
+          <div className="relative flex items-center gap-2 justify-center">
+            {/* Basic resources */}
+            <ResourceChip label="Wood" value={resources.wood} prevValue={prev.wood || 0} icon="🪵" glowClass="text-amber-500" borderClass="border-amber-900/40" />
+            <ResourceChip label="Stone" value={resources.stone} prevValue={prev.stone || 0} icon="🪨" glowClass="text-stone-300" borderClass="border-stone-800/40" />
+            <ResourceChip label="Metal" value={resources.metal} prevValue={prev.metal || 0} icon="🔩" glowClass="text-zinc-300" borderClass="border-zinc-700/40" />
+            <ResourceChip label="Water" value={resources.water} prevValue={prev.water || 0} icon="💧" glowClass="text-cyan-300" borderClass="border-cyan-900/40" />
+            
+            {/* Refined resources */}
+            <ResourceChip label="Gears" value={resources.gears} prevValue={prev.gears || 0} icon="⚙️" glowClass="resource-glow-gears text-amber-300" borderClass="border-amber-800/50" isRare />
+            <ResourceChip label="Steam" value={resources.steam} prevValue={prev.steam || 0} icon="💨" glowClass="resource-glow-steam text-zinc-100" borderClass="border-zinc-700/50" isRare />
+            <ResourceChip label="Crystals" value={resources.crystals} prevValue={prev.crystals || 0} icon="💎" glowClass="resource-glow-crystals text-violet-300" borderClass="border-violet-800/50" isRare />
+            <ResourceChip label="Prints" value={resources.blueprints} prevValue={prev.blueprints || 0} icon="📜" glowClass="text-sky-300" borderClass="border-sky-900/50" isRare />
           </div>
         </div>
 
-        {(tradeBoostActive || evt) && (
-          <div className="flex flex-col gap-1">
-            {tradeBoostActive && (
-              <motion.div
-                initial={{ x: 20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="bg-amber-900/80 border border-amber-500 text-amber-200 px-2 py-0.5 rounded text-[10px] font-bold shadow-lg flex items-center gap-2"
-              >
-                <span className="animate-pulse">⚡</span> PRODUCTION SURGE {tradeBoostTimer}s
-              </motion.div>
-            )}
-            {evt && (
-              <motion.div
-                initial={{ x: 20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="bg-cyan-900/80 border border-cyan-500 text-cyan-200 px-2 py-0.5 rounded text-[10px] font-bold shadow-lg flex items-center gap-2"
-              >
-                <span>{evt.emoji}</span> {evt.label.toUpperCase()} {randomEventTimer}s
-              </motion.div>
-            )}
+        {/* Right: Happiness & Status */}
+        <div className="flex items-center gap-6 shrink-0 pr-4">
+          <div className="flex flex-col items-end">
+            <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-bold font-medieval">Harmony</span>
+            <div className={`flex items-center gap-2 font-medieval text-2xl leading-none drop-shadow-md ${getHappinessColor(villageHappiness)}`}>
+              {getHappinessEmoji(villageHappiness)} {villageHappiness}%
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Subtle bottom detail */}
-      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-transparent via-brass-dim to-transparent opacity-50" />
+          <div className="flex flex-col gap-1 items-end min-w-[150px]">
+            <StatusSlot active={tradeBoostActive} className="bg-amber-900/80 border-amber-500 text-amber-100 shadow-[0_0_15px_rgba(181,137,28,0.4)]">
+              <span className="animate-pulse shrink-0">⚡</span>
+              <span className="truncate font-medieval tracking-widest text-xs">SURGE {tradeBoostTimer}s</span>
+            </StatusSlot>
+            <StatusSlot active={!!evt} className="bg-cyan-900/80 border-cyan-500 text-cyan-100 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+              <span className="shrink-0">{evt?.emoji || '•'}</span>
+              <span className="truncate font-medieval tracking-widest text-xs">{evt ? `${evt.label.toUpperCase()} ${randomEventTimer}s` : ''}</span>
+            </StatusSlot>
+          </div>
+        </div>
+      </div>
     </motion.div>
   )
 }

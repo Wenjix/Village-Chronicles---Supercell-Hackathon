@@ -170,7 +170,7 @@ export default function BuildingInfo() {
                 </div>
              </div>
           ) : building.status === 'proposed' && (
-            <div className="mb-6">
+            <div className="mb-6" data-tutorial="building-assign">
                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3">Authorize Personnel:</p>
                {allWorkersBusy ? (
                  <p className="text-xs text-red-500 font-bold italic">Critical: No Available Personnel</p>

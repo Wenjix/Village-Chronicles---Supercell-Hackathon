@@ -1,5 +1,4 @@
-import * as THREE from 'three'
-import { PLOT_SIZE, CELL_SIZE, gridToWorld } from '../../utils/gridUtils'
+import { PLOT_SIZE } from '../../utils/gridUtils'
 import GridCell from './GridCell'
 import ResourceNode from './ResourceNode'
 import useStore from '../../store/useStore'
@@ -20,17 +19,9 @@ function Plot({ px, py }) {
     }
   }
 
-  // Plot border
-  const plotTotalSize = PLOT_SIZE * CELL_SIZE
-  const [cx, , cz] = gridToWorld(px * PLOT_SIZE + (PLOT_SIZE-1)/2, py * PLOT_SIZE + (PLOT_SIZE-1)/2)
-  
   return (
     <group>
       {cells}
-      <lineSegments position={[cx, 0.02, cz]}>
-        <boxGeometry args={[plotTotalSize, 0.01, plotTotalSize]} />
-        <lineBasicMaterial color="#334155" opacity={0.5} transparent />
-      </lineSegments>
     </group>
   )
 }

@@ -488,3 +488,45 @@ body {
 .animate-float-up {
   animation: float-up 1s ease-out forwards;
 }
+
+/* ─── Tutorial System ─── */
+.tutorial-highlight {
+  border: 2px solid var(--color-brass-bright);
+  border-radius: 4px;
+  box-shadow:
+    0 0 8px rgba(212, 168, 49, 0.5),
+    0 0 20px rgba(212, 168, 49, 0.2),
+    inset 0 0 8px rgba(212, 168, 49, 0.1);
+  animation: tutorial-pulse 2s ease-in-out infinite;
+}
+
+@keyframes tutorial-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(212, 168, 49, 0.5),
+      0 0 20px rgba(212, 168, 49, 0.2),
+      inset 0 0 8px rgba(212, 168, 49, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(212, 168, 49, 0.7),
+      0 0 30px rgba(212, 168, 49, 0.35),
+      inset 0 0 14px rgba(212, 168, 49, 0.2);
+  }
+}
+
+.tutorial-tooltip {
+  background: var(--color-panel-bg);
+  border: 2px solid var(--color-brass-dim);
+  border-image: linear-gradient(to bottom right, #d4a831, #8a6a14, #d4a831) 1;
+  padding: 1rem 1.25rem;
+  box-shadow:
+    0 0 0 1px #000,
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    inset 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+[data-tutorial-highlight] {
+  position: relative;
+  z-index: 930;
+}

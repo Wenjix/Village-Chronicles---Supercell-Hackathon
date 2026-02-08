@@ -86,6 +86,7 @@ export default function BuildMenu() {
           exit={{ opacity: 0, scale: 0.9, y: 50 }}
           style={{ zIndex: 110 }}
           className="fixed bottom-0 left-0 right-0 sm:bottom-10 sm:left-1/2 sm:-translate-x-1/2 sm:w-[32rem] brass-bezel p-6 shadow-2xl bg-black/90 sm:rounded-none"
+          data-tutorial="build-menu"
         >
           {/* Header */}
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-brass-dim/30">
@@ -105,7 +106,7 @@ export default function BuildMenu() {
               const affordable = canAfford(resources, b.type)
               const showDeficit = deficitType === b.type
               return (
-                <div key={b.type}>
+                <div key={b.type} data-tutorial={`build-item-${b.type}`}>
                   <motion.button
                     whileHover={{ x: affordable ? 5 : 0 }}
                     onClick={() => {

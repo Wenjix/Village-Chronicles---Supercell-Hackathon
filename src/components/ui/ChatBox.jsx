@@ -20,6 +20,7 @@ export default function ChatBox() {
   const restVillager = useStore((s) => s.restVillager)
   const assignVillager = useStore((s) => s.assignVillager)
   const draftMilitia = useStore((s) => s.draftMilitia)
+  const markTutorialMessageSent = useStore((s) => s.markTutorialMessageSent)
 
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
@@ -75,6 +76,7 @@ export default function ChatBox() {
 
   async function handlePlayerMessage(text, action) {
     if (!villager || !text.trim()) return
+    markTutorialMessageSent()
 
     if (action === 'bribe') {
       const result = bribeVillager(villager.id)
@@ -260,7 +262,7 @@ export default function ChatBox() {
           </div>
 
           {/* Input & Actions */}
-          <div className="p-4 bg-black/60 border-t border-brass-dim/30 space-y-4">
+          <div className="p-4 bg-black/60 border-t border-brass-dim/30 space-y-4" data-tutorial="chat-input">
             {showOptions && !loading && !isResting && (
               <div className="grid grid-cols-1 gap-2">
                 {dialogueOptions.map((opt, i) => (
