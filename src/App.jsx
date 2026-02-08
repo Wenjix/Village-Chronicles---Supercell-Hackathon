@@ -9,6 +9,7 @@ import NodeInfo from './components/ui/NodeInfo'
 import EnemyInfo from './components/ui/EnemyInfo'
 import PlotNavigator from './components/ui/PlotNavigator'
 import WandererInterview from './components/ui/WandererInterview'
+import Tutorial from './components/ui/Tutorial'
 import useStore from './store/useStore'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
       <PlotNavigator />
       <WandererInterview />
       <ChatBox />
+      <Tutorial />
       {gameOver && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="text-center">
