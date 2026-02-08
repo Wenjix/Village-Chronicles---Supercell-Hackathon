@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { gridToWorld, CELL_SIZE } from '../../utils/gridUtils'
 import useStore from '../../store/useStore'
 import grassUrl from '../../models/grass/ground_grass.glb'
+import cliffBlockUrl from '../../models/grass/cliff_block_rock.glb'
 import riverOpenUrl from '../../models/ground/ground_riverOpen.glb'
 
 export default function GridCell({ x, y, occupied }) {
@@ -25,6 +26,7 @@ export default function GridCell({ x, y, occupied }) {
   const clickable = !occupied || isNode
 
   const grassSource = useGLTF(grassUrl)
+  const cliffSource = useGLTF(cliffBlockUrl)
   const riverOpenSource = useGLTF(riverOpenUrl)
   const groundSource = hasWaterNode ? riverOpenSource : grassSource
 
@@ -54,8 +56,41 @@ export default function GridCell({ x, y, occupied }) {
     return { object: cloned, scale, yOffset }
   }, [groundSource, hasWaterNode])
 
+  const foundation = useMemo(() => {
+    const cloned = cliffSource.scene.clone(true)
+    cloned.traverse((child) => {
+      if (!child.isMesh) return
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      materials.forEach((mat) => {
+        if (!mat) return
+        if (mat.map) {
+          mat.map.colorSpace = THREE.SRGBColorSpace
+        }
+      })
+      child.castShadow = true
+      child.receiveShadow = true
+    })
+
+    const bounds = new THREE.Box3().setFromObject(cloned)
+    const size = new THREE.Vector3()
+    bounds.getSize(size)
+    const maxHorizontal = Math.max(size.x, size.z) || 1
+    const scale = CELL_SIZE / maxHorizontal
+    // Keep cliff top just under y=0 so gameplay objects stay above it.
+    const yOffset = -bounds.max.y * scale - 0.02
+
+    return { object: cloned, scale, yOffset }
+  }, [cliffSource])
+
   return (
     <group position={[wx, 0, wz]}>
+      {/* Cliff foundation for vertical depth under each plot tile */}
+      <primitive
+        object={foundation.object}
+        scale={foundation.scale}
+        position={[0, foundation.yOffset, 0]}
+      />
+
       {/* Grass base */}
       <primitive object={grass.object} scale={grass.scale} position={[0, grass.yOffset, 0]} />
 

@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, useGLTF, useTexture, useAnimations } from '@react-three/drei'
+import { Billboard, Html, useGLTF, useTexture, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { CELL_SIZE } from '../../utils/gridUtils'
@@ -188,10 +188,12 @@ export default function Enemy({ enemy }) {
       </group>
 
       {/* Health Bar */}
-      <mesh position={[0, 0.8, 0]}>
-        <boxGeometry args={[0.4 * (enemy.health / enemy.maxHealth), 0.05, 0.01]} />
-        <meshBasicMaterial color="#ef4444" />
-      </mesh>
+      <Billboard position={[0, 0.8, 0]} follow>
+        <mesh>
+          <boxGeometry args={[0.4 * (enemy.health / enemy.maxHealth), 0.05, 0.01]} />
+          <meshBasicMaterial color="#ef4444" />
+        </mesh>
+      </Billboard>
 
       {/* Label */}
       <Html position={[0, 1.0, 0]} center style={{ pointerEvents: 'none' }}>

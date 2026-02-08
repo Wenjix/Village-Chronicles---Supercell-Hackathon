@@ -32,12 +32,6 @@ export default function VillageGrid() {
 
   return (
     <group>
-      {/* Ground plane (large enough for now) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#0b0f19" metalness={0.1} roughness={1.0} />
-      </mesh>
-
       {unlockedPlots.map((p) => (
         <Plot key={`${p.x},${p.y}`} px={p.x} py={p.y} />
       ))}
