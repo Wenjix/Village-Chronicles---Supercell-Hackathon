@@ -228,7 +228,7 @@ export default function ChatBox() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
           style={{ zIndex: 120 }}
-          className="fixed sm:top-24 sm:left-6 sm:w-[24rem] sm:max-h-[calc(100vh-10rem)] flex flex-col bottom-0 left-0 right-0 sm:right-auto sm:bottom-auto rounded-t-lg sm:rounded-none shadow-2xl brass-bezel"
+          className="fixed top-16 sm:top-24 sm:left-6 sm:w-[24rem] max-h-[calc(100vh-4rem)] sm:max-h-[calc(100vh-10rem)] flex flex-col bottom-0 left-0 right-0 sm:right-auto sm:bottom-auto rounded-t-lg sm:rounded-none shadow-2xl brass-bezel"
         >
           {/* Header */}
           <div className="bg-black/40 px-5 py-4 border-b border-brass-dim/30 flex justify-between items-start">
