@@ -20,7 +20,7 @@ export const BUILDINGS = {
   [BUILDING_TYPES.CLOCKWORK_FORGE]: {
     name: 'Clockwork Forge',
     description: 'Produces 5 Gears per tick. Gears are needed for most advanced buildings.',
-    cost: { wood: 40, stone: 30, metal: 20 },
+    cost: { wood: 27, stone: 20, metal: 14 },
     buildTime: 15,
     produces: { gears: 5 },
     color: '#b87333',
