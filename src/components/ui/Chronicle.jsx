@@ -38,6 +38,19 @@ export default function Chronicle() {
   const events = useStore((s) => s.events)
   const scrollRef = useRef(null)
   const [isOpen, setIsOpen] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 639px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (isMobile) setIsOpen(false)
+  }, [isMobile])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -47,6 +60,8 @@ export default function Chronicle() {
 
   return (
     <>
+      {isMobile ? null : (
+        <>
       {/* Sidebar */}
       <motion.div
         initial={false}
@@ -108,6 +123,8 @@ export default function Chronicle() {
         >
           📜
         </motion.button>
+      )}
+        </>
       )}
     </>
   )

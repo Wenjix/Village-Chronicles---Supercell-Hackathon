@@ -54,7 +54,7 @@ export default function NodeInfo() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 50 }}
           style={{ zIndex: 110 }}
-          className="fixed bottom-0 left-0 right-0 sm:bottom-10 sm:left-1/2 sm:-translate-x-1/2 sm:w-96 brass-bezel p-6 shadow-2xl bg-black/90 sm:rounded-none"
+          className="fixed bottom-0 left-0 right-0 sm:bottom-10 sm:left-1/2 sm:-translate-x-1/2 sm:w-96 max-h-[72vh] sm:max-h-[82vh] overflow-y-auto scrollbar-steampunk brass-bezel p-4 sm:p-6 shadow-2xl bg-black/90 sm:rounded-none"
         >
           {/* Header */}
           <div className="flex justify-between items-start mb-6 pb-4 border-b border-brass-dim/30">

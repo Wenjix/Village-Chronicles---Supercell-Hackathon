@@ -1044,9 +1044,13 @@ const useStore = create(persist((set, get) => ({
             didCombatSfx = true
             // Non-militia flee when hit
             if (!v.isMilitia && !v.assignedBuildingId && !v.assignedNodeId) {
-              v.targetX = v.homeX
-              v.targetY = v.homeY
-              v.walkProgress = 0
+              const alreadyHome = Math.abs(v.x - v.homeX) < 0.01 && Math.abs(v.y - v.homeY) < 0.01
+              const alreadyFleeingHome = v.targetX === v.homeX && v.targetY === v.homeY && v.walkProgress < 1
+              if (!alreadyHome && !alreadyFleeingHome) {
+                v.targetX = v.homeX
+                v.targetY = v.homeY
+                v.walkProgress = 0
+              }
             }
           }
         })

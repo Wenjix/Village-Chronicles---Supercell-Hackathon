@@ -22,14 +22,14 @@ function ResourceChip({ label, value, icon, glowClass, prevValue, borderClass, i
 
   return (
     <div
-      className={`relative flex items-center gap-3 px-4 py-2 border-b-2 border-r-2 ${borderClass} bg-black/40 min-w-[100px] shadow-[inset_0_0_15px_rgba(0,0,0,0.6)] transition-all hover:bg-black/60`}
+      className={`relative flex items-center gap-2 sm:gap-3 px-2.5 sm:px-4 py-1.5 sm:py-2 border-b-2 border-r-2 ${borderClass} bg-black/40 min-w-[76px] sm:min-w-[100px] shadow-[inset_0_0_15px_rgba(0,0,0,0.6)] transition-all hover:bg-black/60`}
     >
-      <span className="text-2xl leading-none shrink-0 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)]">{icon}</span>
+      <span className="text-lg sm:text-2xl leading-none shrink-0 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)]">{icon}</span>
       <div className="flex flex-col min-w-0 leading-tight">
-        <span className={`text-[11px] uppercase tracking-[0.15em] font-medieval truncate drop-shadow-sm font-bold ${isRare ? 'text-amber-400' : 'text-zinc-500'}`}>
+        <span className={`text-[9px] sm:text-[11px] uppercase tracking-[0.1em] sm:tracking-[0.15em] font-medieval truncate drop-shadow-sm font-bold ${isRare ? 'text-amber-400' : 'text-zinc-500'}`}>
           {label}
         </span>
-        <span className={`text-xl font-typewriter tabular-nums leading-none ${glowClass} drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]`}>
+        <span className={`text-sm sm:text-xl font-typewriter tabular-nums leading-none ${glowClass} drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]`}>
           {Math.floor(value)}
         </span>
       </div>
@@ -117,11 +117,11 @@ export default function TopBar() {
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
       style={{ zIndex: 120 }}
-      className="fixed top-0 left-0 right-0 px-4 py-2 pointer-events-none"
+      className="fixed top-0 left-0 right-0 px-2 sm:px-4 py-1 sm:py-2 pointer-events-none"
     >
-      <div className="relative pointer-events-auto flex items-center gap-8 h-[80px]">
+      <div className="relative pointer-events-auto flex items-center gap-2 sm:gap-8 h-[58px] sm:h-[80px]">
         {/* Left: Title & Pop */}
-        <div className="flex flex-col shrink-0 pl-4">
+        <div className="hidden sm:flex flex-col shrink-0 pl-4">
           <span className="font-uncial text-2xl text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] leading-none tracking-tight">
             Village Chronicles
           </span>
@@ -134,13 +134,13 @@ export default function TopBar() {
 
         {/* Center: Resources - unified group */}
         <div
-          className="relative flex-1 min-w-0 brass-bezel px-4 py-1.5 overflow-hidden flex items-center justify-center"
+          className="relative flex-1 min-w-0 brass-bezel px-2 sm:px-4 py-1 sm:py-1.5 overflow-hidden flex items-center justify-center"
           data-tutorial="topbar-resources"
         >
           <div className="absolute inset-0 opacity-10 pointer-events-none bg-black/40" />
           <div className="absolute inset-0 opacity-15 pointer-events-none" style={{ backgroundImage: `url(${panelBorderUrl})`, backgroundSize: '100% 100%' }} />
           
-          <div className="relative flex items-center gap-2 justify-center">
+          <div className="relative flex items-center gap-1.5 sm:gap-2 justify-start sm:justify-center overflow-x-auto w-full scrollbar-steampunk">
             {/* Basic resources */}
             <ResourceChip label="Wood" value={resources.wood} prevValue={prev.wood || 0} icon="🪵" glowClass="text-amber-500" borderClass="border-amber-900/40" />
             <ResourceChip label="Stone" value={resources.stone} prevValue={prev.stone || 0} icon="🪨" glowClass="text-stone-300" borderClass="border-stone-800/40" />
@@ -156,34 +156,38 @@ export default function TopBar() {
         </div>
 
         {/* Right: Happiness & Status */}
-        <div className="flex items-center gap-6 shrink-0 pr-4">
+        <div className="flex items-center gap-2 sm:gap-6 shrink-0 pr-1 sm:pr-4">
           <div className="flex flex-col items-end">
-            <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-bold font-medieval">Harmony</span>
-            <div className={`flex items-center gap-2 font-medieval text-2xl leading-none drop-shadow-md ${getHappinessColor(villageHappiness)}`}>
+            <span className="hidden sm:block text-[11px] uppercase tracking-widest text-zinc-500 font-bold font-medieval">Harmony</span>
+            <div className={`flex items-center gap-1 sm:gap-2 font-medieval text-sm sm:text-2xl leading-none drop-shadow-md ${getHappinessColor(villageHappiness)}`}>
               {getHappinessEmoji(villageHappiness)} {villageHappiness}%
             </div>
           </div>
 
-          <div className="flex flex-col gap-1 items-end min-w-[150px]">
+          <div className="flex flex-col gap-1 items-end min-w-[86px] sm:min-w-[150px]">
             <button
               onClick={handleToggleMusic}
-              className={`px-2.5 py-1 rounded-sm border text-[10px] font-black uppercase tracking-wider transition-all ${
+              className={`px-2 py-1 rounded-sm border text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all ${
                 musicMuted
                   ? 'bg-zinc-900/80 border-zinc-600 text-zinc-300 hover:border-zinc-400'
                   : 'bg-emerald-900/60 border-emerald-500 text-emerald-200 hover:border-emerald-300'
               }`}
               title={musicMuted ? 'Unmute Music' : 'Mute Music'}
             >
-              {musicMuted ? '🔇 Music Off' : '🔊 Music On'}
+              {musicMuted ? '🔇 Off' : '🔊 On'}
             </button>
-            <StatusSlot active={tradeBoostActive} className="bg-amber-900/80 border-amber-500 text-amber-100 shadow-[0_0_15px_rgba(181,137,28,0.4)]">
-              <span className="animate-pulse shrink-0">⚡</span>
-              <span className="truncate font-medieval tracking-widest text-xs">SURGE {tradeBoostTimer}s</span>
-            </StatusSlot>
-            <StatusSlot active={!!evt} className="bg-cyan-900/80 border-cyan-500 text-cyan-100 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-              <span className="shrink-0">{evt?.emoji || '•'}</span>
-              <span className="truncate font-medieval tracking-widest text-xs">{evt ? `${evt.label.toUpperCase()} ${randomEventTimer}s` : ''}</span>
-            </StatusSlot>
+            <div className="hidden sm:block">
+              <StatusSlot active={tradeBoostActive} className="bg-amber-900/80 border-amber-500 text-amber-100 shadow-[0_0_15px_rgba(181,137,28,0.4)]">
+                <span className="animate-pulse shrink-0">⚡</span>
+                <span className="truncate font-medieval tracking-widest text-xs">SURGE {tradeBoostTimer}s</span>
+              </StatusSlot>
+            </div>
+            <div className="hidden sm:block">
+              <StatusSlot active={!!evt} className="bg-cyan-900/80 border-cyan-500 text-cyan-100 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+                <span className="shrink-0">{evt?.emoji || '•'}</span>
+                <span className="truncate font-medieval tracking-widest text-xs">{evt ? `${evt.label.toUpperCase()} ${randomEventTimer}s` : ''}</span>
+              </StatusSlot>
+            </div>
           </div>
         </div>
       </div>
