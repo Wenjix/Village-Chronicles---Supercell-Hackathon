@@ -19,6 +19,7 @@ export default function ChatBox() {
   const bribeVillager = useStore((s) => s.bribeVillager)
   const restVillager = useStore((s) => s.restVillager)
   const assignVillager = useStore((s) => s.assignVillager)
+  const draftMilitia = useStore((s) => s.draftMilitia)
 
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
@@ -32,6 +33,8 @@ export default function ChatBox() {
   const proposedBuildings = buildings.filter((b) => b.status === 'proposed')
   const dialogueOptions = villager ? getDialogueOptions(villager.mood) : []
   const isResting = villager?.restTimer > 0
+  const isHothead = villager?.personality === 'hothead'
+  const isMilitia = villager?.isMilitia
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -73,7 +76,6 @@ export default function ChatBox() {
   async function handlePlayerMessage(text, action) {
     if (!villager || !text.trim()) return
 
-    // Handle special actions before sending to LLM
     if (action === 'bribe') {
       const result = bribeVillager(villager.id)
       if (!result.success) {
@@ -92,7 +94,6 @@ export default function ChatBox() {
         { from: 'system', text: `You spent 25 gears. ${villager.name}'s mood jumps to ${result.newMood}!`, type: 'cost' },
       ])
       setShowOptions(true)
-      // Still send through LLM for flavor response
       setLoading(true)
       try {
         const ctx = buildContext()
@@ -127,7 +128,6 @@ export default function ChatBox() {
       return
     }
 
-    // Normal talk flow
     const playerMsg = { from: 'player', text: text.trim() }
     setMessages((prev) => [...prev, playerMsg])
     conversationHistory.current.push(playerMsg)
@@ -198,12 +198,12 @@ export default function ChatBox() {
     } else if (result.reason === 'already_busy') {
       setMessages((prev) => [
         ...prev,
-        { from: 'system', text: `${villager.name} is already working on another building.` },
+        { from: 'system', text: `${villager.name} is already busy.` },
       ])
     } else if (result.reason === 'resting') {
       setMessages((prev) => [
         ...prev,
-        { from: 'system', text: `${villager.name} is resting and can't take assignments right now. (${villager.restTimer} ticks remaining)`, type: 'warning' },
+        { from: 'system', text: `${villager.name} is resting.`, type: 'warning' },
       ])
     }
   }
@@ -218,7 +218,7 @@ export default function ChatBox() {
           style={{ zIndex: 120 }}
           className="fixed sm:top-24 sm:left-6 sm:w-[24rem] sm:max-h-[calc(100vh-10rem)] flex flex-col bottom-0 left-0 right-0 sm:right-auto sm:bottom-auto rounded-t-lg sm:rounded-none shadow-2xl brass-bezel"
         >
-          {/* Header: Telegram Style */}
+          {/* Header */}
           <div className="bg-black/40 px-5 py-4 border-b border-brass-dim/30 flex justify-between items-start">
             <div className="flex gap-4">
               <div className="w-12 h-12 bg-zinc-800 rounded border border-brass-dim/50 flex items-center justify-center text-2xl shadow-inner">
@@ -229,10 +229,7 @@ export default function ChatBox() {
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">{villager.role}</span>
                   <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                  <span
-                    className="text-[10px] font-bold uppercase"
-                    style={{ color: moodDef?.color }}
-                  >
+                  <span className="text-[10px] font-bold uppercase" style={{ color: moodDef?.color }}>
                     {moodDef?.label}
                   </span>
                 </div>
@@ -241,81 +238,53 @@ export default function ChatBox() {
             <button onClick={closeChat} className="close-btn-brass mt-1">✕</button>
           </div>
 
-          {/* Messages: Typewriter on paper */}
+          {/* Messages */}
           <div className="flex-1 overflow-hidden flex flex-col bg-[#2a2a3a] p-1">
             <div 
               ref={scrollRef} 
-              className="flex-1 overflow-y-auto space-y-4 p-4 scrollbar-steampunk bg-[url('https://www.transparenttextures.com/patterns/asfalt-dark.png')]"
+              className="flex-1 overflow-y-auto space-y-4 p-4 scrollbar-steampunk"
             >
               {messages.map((msg, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: msg.from === 'player' ? 20 : -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className={`flex ${msg.from === 'player' ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={i} className={`flex ${msg.from === 'player' ? 'justify-end' : 'justify-start'}`}>
                   <div className={
-                    msg.from === 'system'
-                      ? "w-full text-center py-2 px-4 border-y border-brass-dim/10 text-[10px] font-bold uppercase tracking-widest text-amber-600/60 italic"
-                      : msg.from === 'player'
-                      ? "max-w-[85%] bg-blue-900/40 border border-blue-500/30 text-blue-100 px-4 py-2 rounded-sm text-sm font-medium shadow-lg"
-                      : "max-w-[85%] bg-[#e2d1a4] text-[#3d2b1f] px-4 py-3 rounded-sm shadow-md font-typewriter text-xs relative border-l-4 border-[#b5891c]"
+                    msg.from === 'system' ? "w-full text-center py-2 text-[10px] uppercase text-amber-600/60 italic" :
+                    msg.from === 'player' ? "max-w-[85%] bg-blue-900/40 border border-blue-500/30 text-blue-100 px-4 py-2 rounded-sm text-sm" :
+                    "max-w-[85%] bg-[#e2d1a4] text-[#3d2b1f] px-4 py-3 rounded-sm shadow-md text-xs font-serif"
                   }>
-                    {msg.from === 'npc' && (
-                      <div className="absolute -left-1 top-2 w-2 h-2 bg-[#b5891c] rotate-45" />
-                    )}
-                    {msg.from === 'npc'
-                      ? msg.text
-                      : msg.from === 'player'
-                      ? msg.text
-                      : msg.text}
+                    {msg.text}
                   </div>
-                </motion.div>
-              ))}
-              {loading && (
-                <div className="text-[10px] text-zinc-500 italic font-bold uppercase tracking-widest animate-pulse">
-                  ••• Receiving Transmission •••
                 </div>
-              )}
+              ))}
+              {loading && <div className="text-[10px] text-zinc-500 italic animate-pulse px-4">TRANSMITTING...</div>}
             </div>
           </div>
 
-          {/* Input Area */}
+          {/* Input & Actions */}
           <div className="p-4 bg-black/60 border-t border-brass-dim/30 space-y-4">
-            {/* Quick Options */}
             {showOptions && !loading && !isResting && (
               <div className="grid grid-cols-1 gap-2">
-                {dialogueOptions.map((opt, i) => {
-                  const canAffordBribe = opt.action !== 'bribe' || resources.gears >= (opt.cost || 0)
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handlePlayerMessage(opt.message, opt.action || 'talk')}
-                      disabled={!canAffordBribe}
-                      className="group flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 hover:border-brass-dim transition-all text-left disabled:opacity-30"
-                    >
-                      <div className="flex flex-col">
-                        <span className={`text-[10px] font-black uppercase tracking-tighter ${opt.action === 'bribe' ? 'text-orange-500' : opt.action === 'rest' ? 'text-blue-500' : 'text-amber-600'}`}>
-                          {opt.label}
-                        </span>
-                        <span className="text-xs text-zinc-300 group-hover:text-white transition-colors line-clamp-1 italic">
-                          "{opt.message}"
-                        </span>
-                      </div>
-                      {opt.action === 'bribe' && <span className="text-[10px] text-zinc-500 font-mono">25⚙️</span>}
-                    </button>
-                  )
-                })}
+                {dialogueOptions.map((opt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handlePlayerMessage(opt.message, opt.action || 'talk')}
+                    className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 hover:border-brass-dim transition-all text-left"
+                  >
+                    <span className="text-xs text-zinc-300 italic">"{opt.message}"</span>
+                    {opt.action === 'bribe' && <span className="text-[10px] text-zinc-500">25⚙️</span>}
+                  </button>
+                ))}
               </div>
             )}
 
-            {isResting && !loading && (
-              <div className="text-center py-2 bg-blue-950/20 border border-blue-900/30 text-blue-400 text-[10px] font-bold uppercase tracking-widest animate-pulse">
-                💤 OFF-DUTY • {villager.restTimer} TICKS REMAINING
-              </div>
+            {isHothead && !isResting && (
+              <button
+                onClick={() => draftMilitia(villager.id)}
+                className={`w-full py-2 text-[10px] font-black uppercase tracking-widest border transition-all ${isMilitia ? 'bg-red-950/40 border-red-500 text-red-200' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+              >
+                {isMilitia ? '🛡️ DISCHARGE MILITIA' : '⚔️ DRAFT INTO MILITIA'}
+              </button>
             )}
 
-            {/* Manual Input */}
             {!isResting && (
               <div className="flex gap-2">
                 <input
@@ -323,39 +292,29 @@ export default function ChatBox() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  disabled={loading}
-                  placeholder="COMPOSE MESSAGE..."
-                  className="flex-1 bg-black border border-brass-dim/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-amber-100 placeholder:text-zinc-700 outline-none focus:border-amber-500 transition-colors"
+                  placeholder="TYPE MESSAGE..."
+                  className="flex-1 bg-black border border-brass-dim/40 px-3 py-2 text-xs text-amber-100 outline-none"
                 />
                 <button
                   onClick={() => handlePlayerMessage(inputText, 'talk')}
-                  disabled={loading || !inputText.trim()}
-                  className="btn-brass px-4 text-[10px] uppercase font-black"
+                  className="btn-brass px-4 text-[10px] font-black"
                 >
                   SEND
                 </button>
               </div>
             )}
 
-            {/* Assignments */}
             {proposedBuildings.length > 0 && !villager.assignedBuildingId && !isResting && (
-              <div className="pt-2 border-t border-zinc-800">
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2">Deploy to Sector:</p>
-                <div className="flex flex-wrap gap-2">
-                  {proposedBuildings.map((b) => {
-                    const names = { clockwork_forge: 'FORGE', steam_mill: 'MILL', crystal_refinery: 'REFINERY', airship_dock: 'DOCK', inventors_workshop: 'WORKSHOP' }
-                    return (
-                      <button
-                        key={b.id}
-                        onClick={() => handleAssign(b.id)}
-                        disabled={loading}
-                        className="btn-blue px-3 py-1 text-[10px] font-black"
-                      >
-                        {names[b.type] || b.type} [{b.gridX},{b.gridY}]
-                      </button>
-                    )
-                  })}
-                </div>
+              <div className="pt-2 border-t border-zinc-800 flex flex-wrap gap-2">
+                {proposedBuildings.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => handleAssign(b.id)}
+                    className="btn-blue px-3 py-1 text-[10px] font-black"
+                  >
+                    DEPLOY [{b.gridX},{b.gridY}]
+                  </button>
+                ))}
               </div>
             )}
           </div>

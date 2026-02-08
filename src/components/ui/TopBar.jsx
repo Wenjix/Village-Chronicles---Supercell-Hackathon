@@ -67,9 +67,11 @@ export default function TopBar() {
   const resources = useStore((s) => s.resources)
   const buildings = useStore((s) => s.buildings)
   const population = useStore((s) => s.population)
+  const maxPopulation = useStore((s) => s.maxPopulation)
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
   const tradeBoostTimer = useStore((s) => s.tradeBoostTimer)
   const villageHappiness = useStore((s) => s.villageHappiness)
+  const threatMeter = useStore((s) => s.threatMeter)
   const activeRandomEvent = useStore((s) => s.activeRandomEvent)
   const randomEventTimer = useStore((s) => s.randomEventTimer)
   const [prev, setPrev] = useState(resources)
@@ -100,7 +102,7 @@ export default function TopBar() {
             Village Chronicles
           </span>
           <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-amber-600/80 font-bold">
-            <span className="flex items-center gap-1">👥 {population} citizens</span>
+            <span className="flex items-center gap-1">👥 {population}/{maxPopulation} citizens</span>
             <span>•</span>
             <span className="flex items-center gap-1">{activeBuildings} structures</span>
           </div>
@@ -108,50 +110,46 @@ export default function TopBar() {
       </div>
 
       {/* Center: Resource Dashboard */}
-      <div className="relative flex items-center gap-1 bg-black/40 rounded-lg p-1 border border-brass-dim/30 shadow-inner">
-        <ResourceDisplay
-          label="Gears"
-          value={resources.gears}
-          prevValue={prev.gears}
-          icon="⚙️"
-          glowClass="resource-glow-gears text-amber-400"
-          gaugeClass="border-amber-900/40 bg-amber-950/30"
-        />
+      <div className="relative flex items-center gap-0.5 bg-black/40 rounded-lg p-1 border border-brass-dim/30 shadow-inner">
+        {/* Raw Resources */}
+        <ResourceDisplay label="Wood" value={resources.wood} prevValue={prev.wood || 0} icon="🪵" glowClass="text-amber-600" gaugeClass="border-amber-900/40 bg-amber-950/30" />
         <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay
-          label="Steam"
-          value={resources.steam}
-          prevValue={prev.steam}
-          icon="💨"
-          glowClass="resource-glow-steam text-zinc-300"
-          gaugeClass="border-zinc-700/40 bg-zinc-900/30"
-        />
+        <ResourceDisplay label="Stone" value={resources.stone} prevValue={prev.stone || 0} icon="🪨" glowClass="text-stone-400" gaugeClass="border-stone-700/40 bg-stone-900/30" />
         <div className="w-px h-8 bg-brass-dim/20 self-center" />
-        <ResourceDisplay
-          label="Crystals"
-          value={resources.crystals}
-          prevValue={prev.crystals}
-          icon="💎"
-          glowClass="resource-glow-crystals text-purple-400"
-          gaugeClass="border-purple-800/40 bg-purple-950/30"
-        />
+        <ResourceDisplay label="Metal" value={resources.metal} prevValue={prev.metal || 0} icon="🔩" glowClass="text-slate-300" gaugeClass="border-slate-700/40 bg-slate-900/30" />
+        <div className="w-px h-8 bg-brass-dim/20 self-center" />
+        <ResourceDisplay label="Water" value={resources.water} prevValue={prev.water || 0} icon="💧" glowClass="text-cyan-400" gaugeClass="border-cyan-700/40 bg-cyan-900/30" />
+
+        {/* Divider between raw and refined */}
+        <div className="w-0.5 h-10 bg-brass-dim/40 self-center mx-1" />
+
+        {/* Refined Resources */}
+        <ResourceDisplay label="Gears" value={resources.gears} prevValue={prev.gears} icon="⚙️" glowClass="resource-glow-gears text-amber-400" gaugeClass="border-amber-900/40 bg-amber-950/30" />
+        <div className="w-px h-8 bg-brass-dim/20 self-center" />
+        <ResourceDisplay label="Steam" value={resources.steam} prevValue={prev.steam} icon="💨" glowClass="resource-glow-steam text-zinc-300" gaugeClass="border-zinc-700/40 bg-zinc-900/30" />
+        <div className="w-px h-8 bg-brass-dim/20 self-center" />
+        <ResourceDisplay label="Crystals" value={resources.crystals} prevValue={prev.crystals} icon="💎" glowClass="resource-glow-crystals text-purple-400" gaugeClass="border-purple-800/40 bg-purple-950/30" />
         {resources.blueprints > 0 && (
           <>
             <div className="w-px h-8 bg-brass-dim/20 self-center" />
-            <ResourceDisplay
-              label="Blueprints"
-              value={resources.blueprints}
-              prevValue={prev.blueprints || 0}
-              icon="📜"
-              glowClass="text-blue-400"
-              gaugeClass="border-blue-800/40 bg-blue-950/30"
-            />
+            <ResourceDisplay label="Blueprints" value={resources.blueprints} prevValue={prev.blueprints || 0} icon="📜" glowClass="text-blue-400" gaugeClass="border-blue-800/40 bg-blue-950/30" />
           </>
         )}
       </div>
 
       {/* Right: Happiness & Events */}
-      <div className="relative flex items-center gap-4">
+      <div className="relative flex items-center gap-6">
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] uppercase tracking-wider text-red-500 font-bold">Steam Pressure (Threat)</span>
+          <div className="w-24 h-2 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
+            <motion.div 
+              className="h-full bg-red-500"
+              initial={{ width: 0 }}
+              animate={{ width: `${threatMeter}%` }}
+            />
+          </div>
+        </div>
+
         <div className="flex flex-col items-end">
           <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Village Harmony</span>
           <div className={`flex items-center gap-2 font-medieval text-lg ${getHappinessColor(villageHappiness)}`}>
