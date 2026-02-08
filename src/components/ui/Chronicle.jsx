@@ -11,99 +11,104 @@ function ChronicleEntry({ event }) {
   })
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-      className="border-l-2 border-amber-800/50 pl-3 py-2"
-    >
+    <div className="relative pl-8 pr-3 py-4 border-b border-black/10">
+      {/* Visual dots */}
+      <div className="absolute left-2.5 top-5 w-2 h-2 rounded-full bg-black/10" />
+      <div className="absolute left-[13px] top-7 bottom-0 w-px bg-black/5" />
+
       <div className="flex items-center gap-2 mb-1">
+        <span className="text-[10px] text-black/40 font-typewriter uppercase font-bold">
+          [{time}]
+        </span>
         {def && (
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: def.color }}
+          <span 
+            className="w-2 h-2 rounded-full shadow-sm" 
+            style={{ backgroundColor: def.color }} 
           />
         )}
-        <span className="text-xs text-zinc-600">{time}</span>
       </div>
-      <p className="font-medieval text-sm text-zinc-300 leading-relaxed">
+      <div className="font-typewriter text-[13px] text-[#3d2b1f] leading-relaxed">
         {event.text}
-      </p>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 
 export default function Chronicle() {
   const events = useStore((s) => s.events)
   const scrollRef = useRef(null)
-  const [collapsed, setCollapsed] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [events])
+  }, [events, isOpen])
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Sidebar */}
       <motion.div
-        initial={{ x: 300 }}
-        animate={{ x: 0 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-        className="fixed top-14 right-0 bottom-0 z-30 w-80 panel border-l border-zinc-800/50 hidden md:flex flex-col"
+        initial={false}
+        animate={{ x: isOpen ? 0 : 350 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        style={{ zIndex: 100 }}
+        className="fixed top-20 right-0 bottom-10 w-80 parchment flex flex-col shadow-2xl rounded-l-xl border-l-4 border-brass-dim/20"
       >
-        <div className="p-3 border-b border-zinc-800/50">
-          <h2 className="font-medieval text-lg text-amber-400">The Chronicle</h2>
-          <p className="text-xs text-zinc-600">A record of thy settlement's history</p>
+        {/* Header - Fixed height */}
+        <div className="p-8 border-b border-black/10 flex justify-between items-center bg-black/5">
+          <div>
+            <h2 className="font-uncial text-2xl text-[#2d1b0f] leading-none">The Chronicle</h2>
+            <p className="text-[10px] font-bold font-typewriter text-black/40 mt-2 uppercase tracking-widest">Village Record</p>
+          </div>
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10 text-black/50 transition-colors"
+          >
+            ✕
+          </button>
         </div>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
-          {events.length === 0 ? (
-            <p className="text-sm text-zinc-600 font-medieval italic">
-              The chronicle awaits its first entry. Place a building to begin thy
-              settlement's story...
-            </p>
-          ) : (
-            events.map((e) => <ChronicleEntry key={e.id} event={e} />)
-          )}
+
+        {/* Entries Container - Scrollable */}
+        <div className="flex-1 overflow-hidden relative">
+          <div 
+            ref={scrollRef} 
+            className="absolute inset-0 overflow-y-auto scrollbar-steampunk px-2"
+          >
+            {events.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-sm text-black/30 font-typewriter italic">
+                  The ink is dry... Thy settlement awaits its first deeds.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {events.map((e) => (
+                  <ChronicleEntry key={e.id} event={e} />
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Decorative Gradients */}
+          <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-[#e9d5a1]/50 to-transparent pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#e9d5a1] to-transparent pointer-events-none" />
         </div>
       </motion.div>
 
-      {/* Mobile drawer toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="fixed top-16 right-2 z-50 md:hidden panel rounded-lg p-2 text-amber-400"
-      >
-        📜 {events.length}
-      </button>
-
-      {/* Mobile drawer */}
-      <AnimatePresence>
-        {collapsed && (
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed top-14 right-0 bottom-0 z-40 w-[85vw] max-w-sm panel border-l border-zinc-800/50 flex flex-col md:hidden"
-          >
-            <div className="p-3 border-b border-zinc-800/50 flex justify-between items-center">
-              <h2 className="font-medieval text-lg text-amber-400">The Chronicle</h2>
-              <button
-                onClick={() => setCollapsed(false)}
-                className="text-zinc-500 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {events.map((e) => (
-                <ChronicleEntry key={e.id} event={e} />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Toggle Button */}
+      {!isOpen && (
+        <motion.button
+          initial={{ scale: 0, x: 100 }}
+          animate={{ scale: 1, x: 0 }}
+          whileHover={{ scale: 1.1 }}
+          onClick={() => setIsOpen(true)}
+          style={{ zIndex: 101 }}
+          className="fixed bottom-10 right-10 btn-brass w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-2xl border-4 border-brass-bright"
+        >
+          📜
+        </motion.button>
+      )}
     </>
   )
 }

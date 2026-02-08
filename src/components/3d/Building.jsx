@@ -26,7 +26,7 @@ function ResourcePopup({ resource, amount }) {
     <group ref={ref} position={[0, 1.3, 0]}>
       <Html center style={{ pointerEvents: 'none' }}>
         <span
-          className="animate-float-up font-bold text-sm whitespace-nowrap"
+          className="animate-float-up font-bold text-sm whitespace-nowrap resource-popup-badge"
           style={{ color: RESOURCE_COLORS[resource] || '#fff' }}
         >
           +{amount} {RESOURCE_ICONS[resource] || resource}
@@ -339,13 +339,13 @@ export default function Building({ building }) {
       {/* Proposed indicator */}
       {isProposed && (
         <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
-          <span className="text-xs text-cyan-400 font-bold animate-pulse">NEEDS WORKER</span>
+          <span className="world-badge world-badge-amber">NEEDS WORKER</span>
         </Html>
       )}
       {/* Assigned indicator */}
       {isAssigned && (
         <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
-          <span className="text-xs text-blue-400 font-bold">WORKER EN ROUTE</span>
+          <span className="world-badge world-badge-blue">WORKER EN ROUTE</span>
         </Html>
       )}
       {popups.map((p) => (

@@ -90,14 +90,19 @@ export default function NPC({ villager }) {
 
       {/* Mood emoji overlay */}
       <Html position={[0, 0.55, 0]} center style={{ pointerEvents: 'none' }}>
-        <div className="text-lg select-none" style={{ textShadow: '0 0 4px rgba(0,0,0,0.8)' }}>
-          {moodDef.emoji}
-        </div>
-        {feudTargetName && (
-          <div className="text-[9px] text-red-400 whitespace-nowrap text-center mt-0.5">
-            vs {feudTargetName}
+        <div className="flex flex-col items-center">
+          <div className="text-lg select-none" style={{ textShadow: '0 0 4px rgba(0,0,0,0.8)' }}>
+            {moodDef.emoji}
           </div>
-        )}
+          <div className="npc-label mt-0.5 uppercase tracking-tighter font-bold">
+            {villager.name}
+          </div>
+          {feudTargetName && (
+            <div className="text-[9px] text-red-400 whitespace-nowrap text-center mt-0.5 bg-black/60 px-1 rounded">
+              vs {feudTargetName}
+            </div>
+          )}
+        </div>
       </Html>
     </group>
   )

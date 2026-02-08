@@ -3,7 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { RANDOM_EVENTS } from '../../data/moods'
 
-function ResourceDisplay({ label, value, icon, glowClass, prevValue }) {
+const GAUGE_TINTS = {
+  gears: 'border-amber-800/30 bg-amber-950/20',
+  steam: 'border-zinc-700/30 bg-zinc-900/20',
+  crystals: 'border-purple-800/30 bg-purple-950/20',
+  blueprints: 'border-blue-800/30 bg-blue-950/20',
+}
+
+function ResourceDisplay({ label, value, icon, glowClass, prevValue, gaugeClass }) {
   const [diff, setDiff] = useState(null)
 
   useEffect(() => {
@@ -18,7 +25,7 @@ function ResourceDisplay({ label, value, icon, glowClass, prevValue }) {
   }, [value, prevValue])
 
   return (
-    <div className="flex items-center gap-1 sm:gap-2 relative">
+    <div className={`resource-gauge ${gaugeClass} flex items-center gap-1 sm:gap-2 relative`}>
       <span className="text-sm sm:text-lg">{icon}</span>
       <div className="flex flex-col">
         <span className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider hidden sm:block">{label}</span>
@@ -77,77 +84,107 @@ export default function TopBar() {
 
   return (
     <motion.div
-      initial={{ y: -60 }}
+      initial={{ y: -100 }}
       animate={{ y: 0 }}
-      transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-      className="fixed top-0 left-0 right-0 z-40 panel px-4 py-2 flex items-center justify-between"
+      transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+      style={{ zIndex: 120 }}
+      className="fixed top-0 left-0 right-0 px-6 py-2 flex items-center justify-between pointer-events-none"
     >
-      <div className="flex items-center gap-1">
-        <span className="font-medieval text-xl text-amber-400 hidden sm:inline">
-          Village Chronicles
-        </span>
-        <span className="font-medieval text-xl text-amber-400 sm:hidden">VC</span>
+      {/* Decorative Brass Bar */}
+      <div className="absolute inset-0 h-16 bg-black/80 border-b-4 border-brass-dim/50 shadow-2xl pointer-events-auto" />
+      
+      {/* Left: Title & Population */}
+      <div className="relative flex items-center gap-6 pointer-events-auto">
+        <div className="flex flex-col">
+          <span className="font-uncial text-2xl text-amber-400 drop-shadow-md leading-tight">
+            Village Chronicles
+          </span>
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-amber-600/80 font-bold">
+            <span className="flex items-center gap-1">👥 {population} citizens</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">{activeBuildings} structures</span>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4 sm:gap-6">
+      {/* Center: Resource Dashboard */}
+      <div className="relative flex items-center gap-1 bg-black/40 rounded-lg p-1 border border-brass-dim/30 shadow-inner">
         <ResourceDisplay
           label="Gears"
           value={resources.gears}
           prevValue={prev.gears}
           icon="⚙️"
           glowClass="resource-glow-gears text-amber-400"
+          gaugeClass="border-amber-900/40 bg-amber-950/30"
         />
+        <div className="w-px h-8 bg-brass-dim/20 self-center" />
         <ResourceDisplay
           label="Steam"
           value={resources.steam}
           prevValue={prev.steam}
           icon="💨"
           glowClass="resource-glow-steam text-zinc-300"
+          gaugeClass="border-zinc-700/40 bg-zinc-900/30"
         />
+        <div className="w-px h-8 bg-brass-dim/20 self-center" />
         <ResourceDisplay
           label="Crystals"
           value={resources.crystals}
           prevValue={prev.crystals}
           icon="💎"
           glowClass="resource-glow-crystals text-purple-400"
+          gaugeClass="border-purple-800/40 bg-purple-950/30"
         />
         {resources.blueprints > 0 && (
-          <ResourceDisplay
-            label="Blueprints"
-            value={resources.blueprints}
-            prevValue={prev.blueprints || 0}
-            icon="📜"
-            glowClass="text-blue-400"
-          />
+          <>
+            <div className="w-px h-8 bg-brass-dim/20 self-center" />
+            <ResourceDisplay
+              label="Blueprints"
+              value={resources.blueprints}
+              prevValue={prev.blueprints || 0}
+              icon="📜"
+              glowClass="text-blue-400"
+              gaugeClass="border-blue-800/40 bg-blue-950/30"
+            />
+          </>
         )}
       </div>
 
-      <div className="flex items-center gap-3 text-sm text-zinc-400">
-        <span>👥 {population}</span>
-        <span className={`${getHappinessColor(villageHappiness)}`}>
-          {getHappinessEmoji(villageHappiness)} {villageHappiness}%
-        </span>
-        <span className="hidden sm:inline">·</span>
-        <span className="hidden sm:inline">{activeBuildings} buildings</span>
-        {tradeBoostActive && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="text-amber-300 font-bold"
-          >
-            2x BOOST {tradeBoostTimer}s
-          </motion.span>
-        )}
-        {evt && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="text-cyan-300 font-bold"
-          >
-            {evt.emoji} {evt.label} {randomEventTimer}s
-          </motion.span>
+      {/* Right: Happiness & Events */}
+      <div className="relative flex items-center gap-4">
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Village Harmony</span>
+          <div className={`flex items-center gap-2 font-medieval text-lg ${getHappinessColor(villageHappiness)}`}>
+            {getHappinessEmoji(villageHappiness)} {villageHappiness}%
+          </div>
+        </div>
+
+        {(tradeBoostActive || evt) && (
+          <div className="flex flex-col gap-1">
+            {tradeBoostActive && (
+              <motion.div
+                initial={{ x: 20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="bg-amber-900/80 border border-amber-500 text-amber-200 px-2 py-0.5 rounded text-[10px] font-bold shadow-lg flex items-center gap-2"
+              >
+                <span className="animate-pulse">⚡</span> PRODUCTION SURGE {tradeBoostTimer}s
+              </motion.div>
+            )}
+            {evt && (
+              <motion.div
+                initial={{ x: 20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="bg-cyan-900/80 border border-cyan-500 text-cyan-200 px-2 py-0.5 rounded text-[10px] font-bold shadow-lg flex items-center gap-2"
+              >
+                <span>{evt.emoji}</span> {evt.label.toUpperCase()} {randomEventTimer}s
+              </motion.div>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Subtle bottom detail */}
+      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-transparent via-brass-dim to-transparent opacity-50" />
     </motion.div>
   )
 }

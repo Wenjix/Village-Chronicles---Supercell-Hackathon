@@ -30,32 +30,31 @@ export default function BuildingInfo() {
     if (!building) return
     const result = assignVillager(building.id, villagerId)
     if (result.reason === 'refused') {
-      // Open chat with this villager so player can negotiate
       openChat(villagerId)
     }
   }
 
-  function getStatusDisplay() {
+  function getStatusBadge() {
     if (!building) return null
     switch (building.status) {
       case 'proposed':
-        return <span className="text-cyan-400">Proposed — needs worker</span>
+        return <span className="glow-badge text-cyan-400">Proposed</span>
       case 'assigned':
-        return <span className="text-blue-400">Worker en route...</span>
+        return <span className="glow-badge text-blue-400">En route</span>
       case 'building': {
         const workerMood = assignedWorker?.mood
         const speed = workerMood ? MOODS[workerMood]?.buildSpeed : 1
         return (
-          <span className="text-amber-400">
+          <span className="glow-badge text-amber-400">
             Building... {Math.ceil(building.timer)}s
             {speed && speed < 1 && (
-              <span className="text-red-400 text-xs ml-1">({speed}x speed)</span>
+              <span className="text-red-400 text-[10px] ml-1">({speed}x)</span>
             )}
           </span>
         )
       }
       case 'active':
-        return <span className="text-green-400">Active</span>
+        return <span className="glow-badge-static text-green-400">Active</span>
       default:
         return <span>{building.status}</span>
     }
@@ -65,129 +64,131 @@ export default function BuildingInfo() {
     <AnimatePresence>
       {building && def && (
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="fixed bottom-4 left-4 z-50 panel rounded-xl p-4 w-72"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          style={{ zIndex: 110 }}
+          className="fixed bottom-0 left-0 right-0 sm:bottom-10 sm:left-1/2 sm:-translate-x-1/2 sm:w-96 brass-bezel p-6 shadow-2xl bg-black/90 sm:rounded-none"
         >
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="font-medieval text-lg text-amber-400">{def.name}</h3>
-            <button
-              onClick={closeInfo}
-              className="text-zinc-500 hover:text-white text-lg leading-none"
-            >
-              ✕
-            </button>
+          {/* Header */}
+          <div className="flex justify-between items-start mb-6 pb-4 border-b border-brass-dim/30">
+            <div className="flex items-center gap-4">
+               <div
+                className="w-12 h-12 flex items-center justify-center text-2xl bg-black/40 border border-white/5 rounded"
+                style={{ color: def.color, boxShadow: `inset 0 0 10px ${def.color}20` }}
+              >
+                {def.type === 'clockwork_forge' ? '⚒️' : 
+                 def.type === 'steam_mill' ? '💨' :
+                 def.type === 'crystal_refinery' ? '💎' :
+                 def.type === 'airship_dock' ? '⚓' : '⚙️'}
+              </div>
+              <div>
+                <h3 className="font-uncial text-xl text-amber-400">{def.name}</h3>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Structural Analysis V.1</p>
+              </div>
+            </div>
+            <button onClick={closeInfo} className="close-btn-brass">✕</button>
           </div>
 
-          <p className="text-sm text-zinc-400 mb-3">{def.description}</p>
-
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-zinc-500">Status</span>
-              {getStatusDisplay()}
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-500">Level</span>
-              <span>{building.level}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-500">Position</span>
-              <span>({building.gridX}, {building.gridY})</span>
-            </div>
-            {def.produces && Object.keys(def.produces).length > 0 && (
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Produces</span>
-                <span>
-                  {Object.entries(def.produces)
-                    .map(([r, a]) => `${a * (building.level || 1)} ${r}/s`)
-                    .join(', ')}
-                  {building.level > 1 && (
-                    <span className="text-blue-400 ml-1">(Lv.{building.level})</span>
-                  )}
-                </span>
-              </div>
-            )}
-            {assignedWorker && (
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-500">Worker</span>
-                <span className="flex items-center gap-1">
-                  {assignedWorker.name}
-                  <span
-                    className="text-xs"
-                    style={{ color: MOODS[assignedWorker.mood]?.color }}
-                  >
-                    {MOODS[assignedWorker.mood]?.emoji}
-                  </span>
-                </span>
-              </div>
-            )}
+          <div className="bg-[#12121a] border border-white/5 p-4 mb-6 rounded-sm relative overflow-hidden">
+             {/* Schematic lines effect */}
+             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ 
+               backgroundImage: 'linear-gradient(#4a9eff 1px, transparent 1px), linear-gradient(90deg, #4a9eff 1px, transparent 1px)',
+               backgroundSize: '20px 20px'
+             }} />
+             
+             <p className="text-xs text-zinc-400 leading-relaxed relative z-10 italic">
+               "{def.description}"
+             </p>
           </div>
 
-          {/* Proposed: show available workers to assign */}
-          {building.status === 'proposed' && (
-            <div className="mt-3 border-t border-zinc-700 pt-3">
-              <p className="text-xs text-zinc-400 mb-2">Assign a worker:</p>
-              {allWorkersBusy ? (
-                <p className="text-xs text-red-400">All workers are busy!</p>
-              ) : (
-                <div className="space-y-1">
-                  {availableWorkers.map((v) => {
-                    const mood = MOODS[v.mood]
-                    return (
-                      <button
-                        key={v.id}
-                        onClick={() => handleAssign(v.id)}
-                        className="w-full flex items-center justify-between px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs transition-colors cursor-pointer"
-                      >
-                        <span>{v.name}</span>
-                        <span
-                          className="px-1.5 py-0.5 rounded-full"
-                          style={{ backgroundColor: mood?.color + '30', color: mood?.color }}
-                        >
-                          {mood?.emoji} {mood?.label}
-                          {mood?.refusalChance > 0 && (
-                            <span className="ml-1 opacity-70">
-                              ({Math.round(mood.refusalChance * 100)}% refuse)
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    )
-                  })}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[10px] font-bold uppercase tracking-wider mb-6">
+            <div className="flex flex-col gap-1">
+              <span className="text-zinc-600">Current Status</span>
+              <div className="flex items-center gap-2">
+                 <div className={`w-2 h-2 rounded-full animate-pulse ${building.status === 'active' ? 'bg-green-500' : 'bg-amber-500'}`} />
+                 <span className={building.status === 'active' ? 'text-green-400' : 'text-amber-400'}>{building.status}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-zinc-600">Operational Level</span>
+              <span className="text-blue-400">LVL {building.level}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-zinc-600">Coordinates</span>
+              <span className="text-zinc-300">X:{building.gridX} Y:{building.gridY}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-zinc-600">Net Production</span>
+              <span className="text-amber-200">
+                {Object.entries(def.produces || {})
+                  .map(([r, a]) => `${a * (building.level || 1)} ${r}/TIC`)
+                  .join(', ')}
+              </span>
+            </div>
+          </div>
+
+          {assignedWorker ? (
+             <div className="p-3 bg-blue-900/10 border border-blue-500/20 rounded-sm mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <span className="text-xl">{MOODS[assignedWorker.mood]?.emoji}</span>
+                   <div>
+                      <p className="text-[10px] text-blue-400 font-black uppercase tracking-tighter">Assigned Overseer</p>
+                      <p className="text-sm text-blue-100 font-medieval">{assignedWorker.name}</p>
+                   </div>
                 </div>
-              )}
+                <div className="text-right">
+                   <p className="text-[9px] text-zinc-500 uppercase font-bold">Mental State</p>
+                   <p className="text-[10px] font-black uppercase" style={{ color: MOODS[assignedWorker.mood]?.color }}>
+                     {MOODS[assignedWorker.mood]?.label}
+                   </p>
+                </div>
+             </div>
+          ) : building.status === 'proposed' && (
+            <div className="mb-6">
+               <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3">Authorize Personnel:</p>
+               {allWorkersBusy ? (
+                 <p className="text-xs text-red-500 font-bold italic">Critical: No Available Personnel</p>
+               ) : (
+                 <div className="space-y-2">
+                   {availableWorkers.map((v) => (
+                     <button
+                       key={v.id}
+                       onClick={() => handleAssign(v.id)}
+                       className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border border-zinc-800 hover:border-blue-500 transition-all text-left group"
+                     >
+                       <span className="text-xs font-medieval text-zinc-300 group-hover:text-blue-200">{v.name}</span>
+                       <span className="text-[10px] font-black uppercase" style={{ color: MOODS[v.mood]?.color }}>
+                         {MOODS[v.mood]?.label}
+                       </span>
+                     </button>
+                   ))}
+                 </div>
+               )}
             </div>
           )}
 
-          {building.status === 'active' && (
-            <button
-              onClick={() => upgradeBuilding(building.id)}
-              disabled={!canUpgrade}
-              className={`mt-3 w-full py-2 rounded-lg font-semibold text-sm transition-colors ${
-                canUpgrade
-                  ? 'bg-blue-700 hover:bg-blue-600 text-white cursor-pointer'
-                  : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
-              }`}
-            >
-              Upgrade to Lv.{building.level + 1} ({upgradeCost} blueprints)
-            </button>
-          )}
+          <div className="flex gap-2">
+            {building.status === 'active' && (
+              <button
+                onClick={() => upgradeBuilding(building.id)}
+                disabled={!canUpgrade}
+                className="btn-brass flex-1 py-3 text-[10px] uppercase font-black"
+              >
+                UPGRADE SYSTEM ({upgradeCost} BLUEPRINTS)
+              </button>
+            )}
 
-          {def.special === 'trade_boost' && building.status === 'active' && (
-            <button
-              onClick={activateTradeBoost}
-              disabled={tradeBoostActive}
-              className={`mt-3 w-full py-2 rounded-lg font-semibold text-sm transition-colors ${
-                tradeBoostActive
-                  ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
-                  : 'bg-amber-700 hover:bg-amber-600 text-white cursor-pointer'
-              }`}
-            >
-              {tradeBoostActive ? 'Boost Active' : 'Activate Trade Boost (2x for 30s)'}
-            </button>
-          )}
+            {def.special === 'trade_boost' && building.status === 'active' && (
+              <button
+                onClick={activateTradeBoost}
+                disabled={tradeBoostActive}
+                className="btn-blue flex-1 py-3 text-[10px] uppercase font-black"
+              >
+                {tradeBoostActive ? 'BOOST ONLINE' : 'OVERLOAD SYSTEMS (2X)'}
+              </button>
+            )}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
