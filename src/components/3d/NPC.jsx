@@ -17,6 +17,14 @@ export default function NPC({ villager }) {
   const desiredPosRef = useRef(new THREE.Vector3())
   const smoothWalkProgressRef = useRef(0)
   const walkSegmentKeyRef = useRef('')
+  const pursuitServerRef = useRef({
+    prevX: villager.x,
+    prevY: villager.y,
+    currX: villager.x,
+    currY: villager.y,
+    prevTime: performance.now(),
+    currTime: performance.now(),
+  })
   const openChat = useStore((s) => s.openChat)
   const villagers = useStore((s) => s.villagers)
   const enemies = useStore((s) => s.enemies)
@@ -87,7 +95,8 @@ export default function NPC({ villager }) {
     [villager.targetX, villager.targetY]
   )
   const isMoving = !!(targetPos && villager.walkProgress < 1)
-  const isWorking = !!((villager.assignedBuildingId || villager.assignedNodeId) && !isMoving)
+  const isPursuing = !!(villager.isMilitia && !targetPos && enemies.length > 0)
+  const isWorking = !!((villager.assignedBuildingId || villager.assignedNodeId) && !isMoving && !isPursuing)
   const isAttacking = useMemo(() => {
     if (!villager.isMilitia || enemies.length === 0) return false
     return enemies.some((e) => {
@@ -142,11 +151,11 @@ export default function NPC({ villager }) {
     if (isWorking) {
       return findClip(['interact-right', 'interact-left', 'pick-up'], ['interact', 'pick'])
     }
-    if (isMoving) {
+    if (isMoving || isPursuing) {
       return findClip(['walk', 'sprint'], ['walk', 'sprint'])
     }
     return findClip(['idle', 'static'], ['idle', 'static'])
-  }, [actions, isAttacking, isWorking, isMoving])
+  }, [actions, isAttacking, isWorking, isMoving, isPursuing])
 
   useEffect(() => {
     if (!actions || !resolvedClipName) return
@@ -186,8 +195,20 @@ export default function NPC({ villager }) {
     const [ix, , iz] = gridToWorld(villager.x, villager.y)
     renderPosRef.current.set(ix, 0.02, iz)
     renderPosInitializedRef.current = true
+    smoothWalkProgressRef.current = villager.walkProgress || 0
     if (ref.current) ref.current.position.copy(renderPosRef.current)
   }, [villager.id])
+
+  useEffect(() => {
+    const server = pursuitServerRef.current
+    if (server.currX === villager.x && server.currY === villager.y) return
+    server.prevX = server.currX
+    server.prevY = server.currY
+    server.prevTime = server.currTime
+    server.currX = villager.x
+    server.currY = villager.y
+    server.currTime = performance.now()
+  }, [villager.x, villager.y])
 
   useFrame((_, delta) => {
     if (!ref.current) return
@@ -198,7 +219,19 @@ export default function NPC({ villager }) {
 
     // Walk interpolation
     let wx, wz
-    if (targetPos && villager.walkProgress < 1) {
+    if (isPursuing) {
+      const server = pursuitServerRef.current
+      const dtSec = Math.max(0.001, (server.currTime - server.prevTime) / 1000)
+      const vx = (server.currX - server.prevX) / dtSec
+      const vy = (server.currY - server.prevY) / dtSec
+      const elapsedSec = Math.max(0, (performance.now() - server.currTime) / 1000)
+      const predictHorizon = Math.min(1, elapsedSec)
+      const predictedX = server.currX + vx * predictHorizon
+      const predictedY = server.currY + vy * predictHorizon
+      const [px, , pz] = gridToWorld(predictedX, predictedY)
+      wx = px
+      wz = pz
+    } else if (targetPos && villager.walkProgress < 1) {
       const moveSpeed = MOODS[villager.mood]?.buildSpeed || 1
       smoothWalkProgressRef.current = Math.max(smoothWalkProgressRef.current, villager.walkProgress)
       smoothWalkProgressRef.current = Math.min(1, smoothWalkProgressRef.current + delta * 0.1 * moveSpeed)
@@ -215,8 +248,7 @@ export default function NPC({ villager }) {
 
     desiredPosRef.current.set(wx, 0.02, wz)
 
-    // Militia in pursuit have their x/y directly mutated each tick — use faster lerp to avoid lag
-    const isPursuing = villager.isMilitia && !targetPos && enemies.length > 0
+    // Militia pursuit is dead-reckoned client-side, so use faster follow to reduce visible lag
     const lerpSpeed = isPursuing ? 20 : 8
     const moveAlpha = 1 - Math.exp(-delta * lerpSpeed)
     renderPosRef.current.lerp(desiredPosRef.current, moveAlpha)
@@ -229,6 +261,15 @@ export default function NPC({ villager }) {
       if (isMoving) {
         lookX = desiredPosRef.current.x
         lookZ = desiredPosRef.current.z
+      } else if (isPursuing) {
+        if (nearestEnemy) {
+          const [ex, , ez] = gridToWorld(nearestEnemy.x, nearestEnemy.y)
+          lookX = ex
+          lookZ = ez
+        } else {
+          lookX = desiredPosRef.current.x
+          lookZ = desiredPosRef.current.z
+        }
       } else if (isAttacking && nearestEnemy) {
         const [ex, , ez] = gridToWorld(nearestEnemy.x, nearestEnemy.y)
         lookX = ex
