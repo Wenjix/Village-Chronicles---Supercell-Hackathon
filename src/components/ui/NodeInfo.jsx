@@ -1,15 +1,18 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { NODE_TYPES } from '../../data/nodes'
+import { BUILDINGS } from '../../data/buildings'
 import { MOODS } from '../../data/moods'
 
 export default function NodeInfo() {
   const selectedNodeId = useStore((s) => s.selectedNode)
   const nodes = useStore((s) => s.nodes)
   const villagers = useStore((s) => s.villagers)
+  const buildings = useStore((s) => s.buildings)
   const closeInfo = useStore((s) => s.closeInfo)
   const assignVillagerToNode = useStore((s) => s.assignVillagerToNode)
-  
+  const unassignVillager = useStore((s) => s.unassignVillager)
+
   const node = nodes.find((n) => n.id === selectedNodeId)
   const typeDef = node ? NODE_TYPES[node.type] : null
 
@@ -19,14 +22,20 @@ export default function NodeInfo() {
     ? villagers.filter((v) => v.assignedNodeId === node.id)
     : []
 
-  // Outposts require militia members; resource nodes accept any villager not resting or already on this node
-  const availableWorkers = villagers.filter((v) => {
-    if (v.restTimer > 0) return false
-    if (v.assignedNodeId === node?.id) return false
-    if (isOutpost) return v.isMilitia
-    return true
-  })
-  const allWorkersBusy = availableWorkers.length === 0
+  // Show all eligible villagers (not resting, not already on this node), sorted unassigned first
+  const sortedWorkers = villagers
+    .filter((v) => {
+      if (v.restTimer > 0) return false
+      if (v.assignedNodeId === node?.id) return false
+      if (isOutpost) return v.isMilitia
+      return true
+    })
+    .sort((a, b) => {
+      const aFree = !a.assignedBuildingId && !a.assignedNodeId ? 0 : 1
+      const bFree = !b.assignedBuildingId && !b.assignedNodeId ? 0 : 1
+      return aFree - bFree
+    })
+  const allWorkersBusy = sortedWorkers.length === 0
 
   function handleAssign(villagerId) {
     if (!node) return
@@ -130,9 +139,17 @@ export default function NodeInfo() {
                     <span className="text-lg">{MOODS[w.mood]?.emoji}</span>
                     <span className="text-sm text-blue-100 font-medieval">{w.name}</span>
                   </div>
-                  <span className="text-[10px] font-black uppercase" style={{ color: MOODS[w.mood]?.color }}>
-                    {MOODS[w.mood]?.label}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase" style={{ color: MOODS[w.mood]?.color }}>
+                      {MOODS[w.mood]?.label}
+                    </span>
+                    <button
+                      onClick={() => unassignVillager(w.id)}
+                      className="px-2 py-1 text-[9px] font-black uppercase tracking-wider border border-red-900/40 bg-red-950/30 text-red-400 hover:border-red-500 hover:text-red-300 transition-all rounded-sm"
+                    >
+                      Recall
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -150,20 +167,44 @@ export default function NodeInfo() {
                  </p>
                ) : (
                  <div className="space-y-2">
-                   {availableWorkers.map((v) => (
-                     <button
-                       key={v.id}
-                       onClick={() => handleAssign(v.id)}
-                       className={`w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border transition-all text-left group ${
-                         isOutpost ? 'border-red-900/30 hover:border-red-500' : 'border-zinc-800 hover:border-blue-500'
-                       }`}
-                     >
-                       <span className={`text-xs font-medieval text-zinc-300 ${isOutpost ? 'group-hover:text-red-200' : 'group-hover:text-blue-200'}`}>{v.name}</span>
-                       <span className="text-[10px] font-black uppercase" style={{ color: MOODS[v.mood]?.color }}>
-                         {MOODS[v.mood]?.label}
-                       </span>
-                     </button>
-                   ))}
+                   {sortedWorkers.map((v) => {
+                     const assignedBuilding = v.assignedBuildingId ? buildings.find(b => b.id === v.assignedBuildingId) : null
+                     const assignedNode = v.assignedNodeId ? nodes.find(n => n.id === v.assignedNodeId) : null
+                     const isBusy = !!(assignedBuilding || assignedNode)
+                     const taskLabel = assignedBuilding
+                       ? BUILDINGS[assignedBuilding.type]?.name || 'Building'
+                       : assignedNode
+                         ? NODE_TYPES[assignedNode.type]?.name || 'Harvesting'
+                         : null
+
+                     return (
+                       <button
+                         key={v.id}
+                         onClick={() => handleAssign(v.id)}
+                         className={`w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border transition-all text-left group ${
+                           isOutpost
+                             ? isBusy ? 'border-red-900/20 hover:border-red-600' : 'border-red-900/30 hover:border-red-500'
+                             : isBusy ? 'border-zinc-800/50 hover:border-amber-600' : 'border-zinc-800 hover:border-blue-500'
+                         }`}
+                       >
+                         <div className="flex items-center gap-2 min-w-0">
+                           <span className={`text-xs font-medieval truncate ${
+                             isBusy
+                               ? isOutpost ? 'text-zinc-500 group-hover:text-red-300' : 'text-zinc-500 group-hover:text-amber-300'
+                               : isOutpost ? 'text-zinc-300 group-hover:text-red-200' : 'text-zinc-300 group-hover:text-blue-200'
+                           }`}>{v.name}</span>
+                           {taskLabel && (
+                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-800/40 text-amber-500 uppercase font-black tracking-tighter shrink-0">
+                               {taskLabel}
+                             </span>
+                           )}
+                         </div>
+                         <span className="text-[10px] font-black uppercase shrink-0 ml-2" style={{ color: MOODS[v.mood]?.color }}>
+                           {MOODS[v.mood]?.label}
+                         </span>
+                       </button>
+                     )
+                   })}
                  </div>
                )}
             </div>

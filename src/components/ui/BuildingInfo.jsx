@@ -11,6 +11,7 @@ export default function BuildingInfo() {
   const activateTradeBoost = useStore((s) => s.activateTradeBoost)
   const upgradeBuilding = useStore((s) => s.upgradeBuilding)
   const assignVillager = useStore((s) => s.assignVillager)
+  const unassignVillager = useStore((s) => s.unassignVillager)
   const openChat = useStore((s) => s.openChat)
   const tradeBoostActive = useStore((s) => s.tradeBoostActive)
   const blueprints = useStore((s) => s.resources.blueprints)
@@ -153,11 +154,19 @@ export default function BuildingInfo() {
                       <p className="text-sm text-blue-100 font-medieval">{assignedWorker.name}</p>
                    </div>
                 </div>
-                <div className="text-right">
-                   <p className="text-[9px] text-zinc-500 uppercase font-bold">Mental State</p>
-                   <p className="text-[10px] font-black uppercase" style={{ color: MOODS[assignedWorker.mood]?.color }}>
-                     {MOODS[assignedWorker.mood]?.label}
-                   </p>
+                <div className="flex items-center gap-3">
+                   <div className="text-right">
+                      <p className="text-[9px] text-zinc-500 uppercase font-bold">Mental State</p>
+                      <p className="text-[10px] font-black uppercase" style={{ color: MOODS[assignedWorker.mood]?.color }}>
+                        {MOODS[assignedWorker.mood]?.label}
+                      </p>
+                   </div>
+                   <button
+                     onClick={() => unassignVillager(assignedWorker.id)}
+                     className="px-2 py-1 text-[9px] font-black uppercase tracking-wider border border-red-900/40 bg-red-950/30 text-red-400 hover:border-red-500 hover:text-red-300 transition-all rounded-sm"
+                   >
+                     Recall
+                   </button>
                 </div>
              </div>
           ) : building.status === 'proposed' && (
