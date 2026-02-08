@@ -45,7 +45,7 @@ const useStore = create((set, get) => ({
       id: 1, name: 'Barnaby Cogsworth', role: 'Engineer', x: 2, y: 2,
       homeX: 2, homeY: 2,
       mood: 'happy', personality: 'diligent', moodTimer: 30,
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
       health: 100, maxHealth: 100, isMilitia: false,
@@ -54,7 +54,7 @@ const useStore = create((set, get) => ({
       id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
       homeX: 5, homeY: 3,
       mood: 'happy', personality: 'cheerful', moodTimer: 25,
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
       health: 100, maxHealth: 100, isMilitia: false,
@@ -63,7 +63,7 @@ const useStore = create((set, get) => ({
       id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
       homeX: 4, homeY: 6,
       mood: 'happy', personality: 'hothead', moodTimer: 20,
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
       health: 100, maxHealth: 100, isMilitia: false,
@@ -92,6 +92,7 @@ const useStore = create((set, get) => ({
   selectedCell: null,
   selectedBuilding: null,
   selectedNode: null,
+  selectedEnemy: null,
   chatTarget: null,
   showBuildMenu: false,
   tradeBoostActive: false,
@@ -262,6 +263,7 @@ const useStore = create((set, get) => ({
           y: currentY,
           assignedBuildingId: null,
           assignedNodeId: null,
+          rallyTargetId: null,
           targetX: v.homeX,
           targetY: v.homeY,
           walkProgress: 0,
@@ -890,30 +892,50 @@ const useStore = create((set, get) => ({
             popups.push({ resource: 'blueprints', amount: 10, nodeId: outpost.id })
             const chronicle = "Victory! Our brave pioneers have razed a raider outpost and returned with spoils!"
             newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
+            
+            // Make attackers walk back home
+            newVillagers.forEach(v => {
+              if (v.assignedNodeId === outpost.id) {
+                v.assignedNodeId = null
+                v.targetX = v.homeX
+                v.targetY = v.homeY
+                v.walkProgress = 0
+              }
+            })
           }
         }
       })
 
-      // Militia auto-pursue nearest enemy
+      // Militia auto-pursue nearest enemy (or rally target if set)
       newVillagers.forEach(v => {
         if (!v.isMilitia) return
         if (v.assignedBuildingId || v.assignedNodeId) return
         if (newEnemies.length === 0) return
-        // Find nearest enemy
-        let nearest = null
-        let nearestDist = Infinity
-        newEnemies.forEach(e => {
-          const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
-          if (dist < nearestDist) { nearestDist = dist; nearest = e }
-        })
-        if (nearest && nearestDist > 1.5) {
-          // Move toward enemy
-          const dx = nearest.x - v.x
-          const dy = nearest.y - v.y
+
+        let target = null
+        if (v.rallyTargetId) {
+          target = newEnemies.find(e => e.id === v.rallyTargetId) || null
+          if (!target) v.rallyTargetId = null
+        }
+        if (!target) {
+          // Find nearest enemy
+          let nearest = null
+          let nearestDist = Infinity
+          newEnemies.forEach(e => {
+            const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
+            if (dist < nearestDist) { nearestDist = dist; nearest = e }
+          })
+          target = nearest
+        }
+        if (target) {
+          const dx = target.x - v.x
+          const dy = target.y - v.y
           const dist = Math.sqrt(dx * dx + dy * dy)
-          const speed = 0.15
-          v.x = v.x + (dx / dist) * speed
-          v.y = v.y + (dy / dist) * speed
+          if (dist > 1.5) {
+            const speed = 0.15
+            v.x = v.x + (dx / dist) * speed
+            v.y = v.y + (dy / dist) * speed
+          }
         }
       })
 
@@ -1096,7 +1118,7 @@ const useStore = create((set, get) => ({
       x: 0, y: 0,
       homeX: 0, homeY: 0,
       moodTimer: 30,
-      assignedBuildingId: null, assignedNodeId: null, feudTarget: null,
+      assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: 2 + Math.floor(Math.random()*4), targetY: 2 + Math.floor(Math.random()*4), 
       walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
@@ -1179,20 +1201,47 @@ const useStore = create((set, get) => ({
     set((s) => ({ enemies: [...s.enemies, enemy] }))
   },
 
+  // Rally all idle militia to attack an enemy's position
+  rallyMilitiaTo: (enemyId) => {
+    const state = get()
+    const enemy = state.enemies.find(e => e.id === enemyId)
+    if (!enemy) return 0
+
+    let rallied = 0
+    state.villagers.forEach(v => {
+      if (!v.isMilitia) return
+      // Unassign busy militia first
+      if (v.assignedBuildingId || v.assignedNodeId) {
+        get().unassignVillager(v.id)
+      }
+      rallied++
+    })
+    set((s) => ({
+      villagers: s.villagers.map(v => (
+        v.isMilitia && !v.assignedBuildingId && !v.assignedNodeId
+          ? { ...v, rallyTargetId: enemyId }
+          : v
+      ))
+    }))
+
+    return rallied
+  },
+
   // UI actions
   selectCell: (x, y) => {
     const state = get()
     const key = `${x},${y}`
     const cell = state.grid[key]
     if (typeof cell === 'string' && cell.startsWith('node-')) {
-       set({ selectedNode: parseInt(cell.split('-')[1]), selectedBuilding: null, selectedCell: {x, y}, showBuildMenu: false })
+       set({ selectedNode: parseInt(cell.split('-')[1]), selectedBuilding: null, selectedCell: {x, y}, showBuildMenu: false, selectedEnemy: null })
     } else {
-       set({ selectedCell: { x, y }, showBuildMenu: true, selectedBuilding: null, selectedNode: null })
+       set({ selectedCell: { x, y }, showBuildMenu: true, selectedBuilding: null, selectedNode: null, selectedEnemy: null })
     }
   },
-  selectBuilding: (id) => set({ selectedBuilding: id, showBuildMenu: false, selectedCell: null, selectedNode: null }),
+  selectBuilding: (id) => set({ selectedBuilding: id, showBuildMenu: false, selectedCell: null, selectedNode: null, selectedEnemy: null }),
+  selectEnemy: (id) => set({ selectedEnemy: id, selectedBuilding: null, selectedNode: null, showBuildMenu: false, selectedCell: null }),
   closeBuildMenu: () => set({ showBuildMenu: false, selectedCell: null }),
-  closeInfo: () => set({ selectedBuilding: null, selectedNode: null }),
+  closeInfo: () => set({ selectedBuilding: null, selectedNode: null, selectedEnemy: null }),
   openChat: (villagerId) => set({ chatTarget: villagerId }),
   closeChat: () => set({ chatTarget: null }),
 }))

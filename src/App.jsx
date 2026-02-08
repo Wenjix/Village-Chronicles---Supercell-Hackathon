@@ -6,6 +6,7 @@ import ChatBox from './components/ui/ChatBox'
 import BuildMenu from './components/ui/BuildMenu'
 import BuildingInfo from './components/ui/BuildingInfo'
 import NodeInfo from './components/ui/NodeInfo'
+import EnemyInfo from './components/ui/EnemyInfo'
 import PlotNavigator from './components/ui/PlotNavigator'
 import WandererInterview from './components/ui/WandererInterview'
 import useStore from './store/useStore'
@@ -29,6 +30,7 @@ export default function App() {
       <BuildMenu />
       <BuildingInfo />
       <NodeInfo />
+      <EnemyInfo />
       <PlotNavigator />
       <WandererInterview />
       <ChatBox />
