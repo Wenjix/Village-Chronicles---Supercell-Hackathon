@@ -272,6 +272,106 @@ function Watchtower({ active }) {
   )
 }
 
+function AetherFoundry({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.45, 0]}>
+        <cylinderGeometry args={[0.32, 0.38, 0.9, 10]} />
+        <meshStandardMaterial color="#6d28d9" metalness={0.55} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 1.0, 0]}>
+        <octahedronGeometry args={[0.24]} />
+        <meshStandardMaterial color="#c084fc" emissive={active ? '#9333ea' : '#000000'} emissiveIntensity={active ? 0.9 : 0} />
+      </mesh>
+      {active && <pointLight position={[0, 1.0, 0]} color="#c084fc" intensity={1.6} distance={3.5} />}
+    </group>
+  )
+}
+
+function SkyFortress({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.45, 0]}>
+        <boxGeometry args={[0.8, 0.7, 0.8]} />
+        <meshStandardMaterial color="#475569" metalness={0.65} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.95, 0]}>
+        <torusGeometry args={[0.28, 0.06, 8, 20]} />
+        <meshStandardMaterial color="#94a3b8" emissive={active ? '#38bdf8' : '#000000'} emissiveIntensity={active ? 0.8 : 0} />
+      </mesh>
+      {active && <pointLight position={[0, 0.95, 0]} color="#38bdf8" intensity={1.2} distance={3.5} />}
+    </group>
+  )
+}
+
+function GrandClocktower({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.7, 0]}>
+        <cylinderGeometry args={[0.2, 0.28, 1.4, 8]} />
+        <meshStandardMaterial color="#b45309" metalness={0.5} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, 1.45, 0]}>
+        <cylinderGeometry args={[0.34, 0.34, 0.18, 16]} />
+        <meshStandardMaterial color="#fbbf24" metalness={0.7} roughness={0.25} />
+      </mesh>
+      {active && <RotatingGear position={[0, 1.45, 0]} size={0.14} />}
+    </group>
+  )
+}
+
+function Mansion({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.35, 0]}>
+        <boxGeometry args={[0.95, 0.7, 0.95]} />
+        <meshStandardMaterial color="#9f1239" metalness={0.2} roughness={0.75} />
+      </mesh>
+      <mesh position={[0, 0.95, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[0.7, 0.5, 4]} />
+        <meshStandardMaterial color="#be123c" metalness={0.2} roughness={0.7} />
+      </mesh>
+      {active && (
+        <pointLight position={[0, 0.8, 0]} color="#fb7185" intensity={0.4} distance={2.5} />
+      )}
+    </group>
+  )
+}
+
+function AetherConduit({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.4, 0]}>
+        <cylinderGeometry args={[0.35, 0.42, 0.8, 12]} />
+        <meshStandardMaterial color="#7dd3fc" metalness={0.65} roughness={0.2} />
+      </mesh>
+      <mesh position={[0, 1.05, 0]}>
+        <sphereGeometry args={[0.24, 20, 20]} />
+        <meshStandardMaterial
+          color="#e0f2fe"
+          emissive={active ? '#7dd3fc' : '#000000'}
+          emissiveIntensity={active ? 1.2 : 0}
+          metalness={0.15}
+          roughness={0.15}
+        />
+      </mesh>
+      {active && <pointLight position={[0, 1.05, 0]} color="#7dd3fc" intensity={2.2} distance={4.5} />}
+    </group>
+  )
+}
+
+function UnknownStructure({ active, color = '#64748b' }) {
+  return (
+    <group>
+      <mesh position={[0, 0.35, 0]}>
+        <boxGeometry args={[0.7, 0.7, 0.7]} />
+        <meshStandardMaterial color={color} metalness={0.35} roughness={0.55} />
+      </mesh>
+      {active && <pointLight position={[0, 0.8, 0]} color={color} intensity={0.4} distance={2.5} />}
+    </group>
+  )
+}
+
 const BUILDING_COMPONENTS = {
   [BUILDING_TYPES.CLOCKWORK_FORGE]: ClockworkForge,
   [BUILDING_TYPES.STEAM_MILL]: SteamMill,
@@ -282,6 +382,11 @@ const BUILDING_COMPONENTS = {
   [BUILDING_TYPES.COTTAGE]: Cottage,
   [BUILDING_TYPES.TESLA_TOWER]: TeslaTower,
   [BUILDING_TYPES.WATCHTOWER]: Watchtower,
+  [BUILDING_TYPES.AETHER_FOUNDRY]: AetherFoundry,
+  [BUILDING_TYPES.SKY_FORTRESS]: SkyFortress,
+  [BUILDING_TYPES.GRAND_CLOCKTOWER]: GrandClocktower,
+  [BUILDING_TYPES.MANSION]: Mansion,
+  [BUILDING_TYPES.AETHER_CONDUIT]: AetherConduit,
 }
 
 export default function Building({ building }) {
@@ -312,6 +417,7 @@ export default function Building({ building }) {
     }
   }, [resourcePopups])
 
+  const buildingDef = BUILDINGS[building.type]
   const Component = BUILDING_COMPONENTS[building.type]
   const isProposed = building.status === 'proposed'
   const isAssigned = building.status === 'assigned'
@@ -389,8 +495,6 @@ export default function Building({ building }) {
     }
   })
 
-  if (!Component) return null
-
   return (
     <group
       ref={groupRef}
@@ -402,7 +506,11 @@ export default function Building({ building }) {
       onPointerOver={() => (document.body.style.cursor = 'pointer')}
       onPointerOut={() => (document.body.style.cursor = 'default')}
     >
-      <Component active={active} />
+      {Component ? (
+        <Component active={active} />
+      ) : (
+        <UnknownStructure active={active} color={buildingDef?.color} />
+      )}
       {/* Construction indicator */}
       {isBuilding && (
         <mesh position={[0, 1.2, 0]}>
