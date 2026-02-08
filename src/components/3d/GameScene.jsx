@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -49,9 +49,11 @@ function Scene({ controlsRef }) {
         <NPC key={v.id} villager={v} />
       ))}
 
-      {enemies.map((e) => (
-        <Enemy key={e.id} enemy={e} />
-      ))}
+      <Suspense fallback={null}>
+        {enemies.map((e) => (
+          <Enemy key={e.id} enemy={e} />
+        ))}
+      </Suspense>
 
       <CameraController controlsRef={controlsRef} />
     </>

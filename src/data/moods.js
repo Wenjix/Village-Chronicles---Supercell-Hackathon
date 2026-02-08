@@ -111,8 +111,8 @@ export const RANDOM_EVENTS = {
  * Returns an event key or null.
  */
 export function rollRandomEvent(happiness) {
-  // 20% chance to trigger any event
-  if (Math.random() > 0.20) return null
+  // 3% chance per tick (~once per 30 seconds on average)
+  if (Math.random() > 0.03) return null
 
   if (happiness >= 70) {
     // Mostly positive

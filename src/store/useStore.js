@@ -9,6 +9,22 @@ import { NODE_TYPES, getRandomNodeType, GUARANTEED_NODE_TYPES } from '../data/no
 let nextBuildingId = 1
 let nextEventId = 1
 let nextNodeId = 1
+const CHARACTER_MODEL_PATHS = [
+  '/src/models/characters/male/character-male-a.glb',
+  '/src/models/characters/male/character-male-b.glb',
+  '/src/models/characters/male/character-male-c.glb',
+  '/src/models/characters/male/character-male-d.glb',
+  '/src/models/characters/male/character-male-e.glb',
+  '/src/models/characters/male/character-male-f.glb',
+  '/src/models/characters/female/character-female-b.glb',
+  '/src/models/characters/female/character-female-c.glb',
+  '/src/models/characters/female/character-female-d.glb',
+  '/src/models/characters/female/character-female-e.glb',
+  '/src/models/characters/female/character-female-f.glb',
+]
+
+const pickCharacterModel = () =>
+  CHARACTER_MODEL_PATHS[Math.floor(Math.random() * CHARACTER_MODEL_PATHS.length)]
 
 const useStore = create((set, get) => ({
   // Resources
@@ -28,7 +44,7 @@ const useStore = create((set, get) => ({
 
   // Enemies (Phase 4)
   enemies: [],
-  threatMeter: 0,
+  gameTick: 0,
 
   // Unlocked plots (8x8 chunks)
   unlockedPlots: [{ x: 0, y: 0 }],
@@ -45,6 +61,7 @@ const useStore = create((set, get) => ({
       id: 1, name: 'Barnaby Cogsworth', role: 'Engineer', x: 2, y: 2,
       homeX: 2, homeY: 2,
       mood: 'happy', personality: 'diligent', moodTimer: 30,
+      modelUrl: '/src/models/characters/male/character-male-a.glb',
       assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
@@ -54,6 +71,7 @@ const useStore = create((set, get) => ({
       id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
       homeX: 5, homeY: 3,
       mood: 'happy', personality: 'cheerful', moodTimer: 25,
+      modelUrl: '/src/models/characters/female/character-female-b.glb',
       assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
@@ -63,6 +81,7 @@ const useStore = create((set, get) => ({
       id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
       homeX: 4, homeY: 6,
       mood: 'happy', personality: 'hothead', moodTimer: 20,
+      modelUrl: '/src/models/characters/male/character-male-b.glb',
       assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
       targetX: null, targetY: null, walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
@@ -86,6 +105,23 @@ const useStore = create((set, get) => ({
   focusPlot: (px, py) => {
     const [wx, , wz] = gridToWorld(px * PLOT_SIZE + 3.5, py * PLOT_SIZE + 3.5)
     set({ cameraTarget: { x: wx, y: 0, z: wz } })
+  },
+
+  // Tutorial state
+  tutorial: {
+    active: !localStorage.getItem('tutorial_done'),
+    step: 'welcome',
+  },
+  _tutorialMessageSent: false,
+  markTutorialMessageSent: () => set({ _tutorialMessageSent: true }),
+  advanceTutorial: (nextStep) => set({ tutorial: { active: true, step: nextStep } }),
+  skipTutorial: () => {
+    localStorage.setItem('tutorial_done', '1')
+    set({ tutorial: { active: false, step: null } })
+  },
+  completeTutorial: () => {
+    localStorage.setItem('tutorial_done', '1')
+    set({ tutorial: { active: false, step: null } })
   },
 
   // UI state
@@ -611,6 +647,13 @@ const useStore = create((set, get) => ({
         }
 
         if (updated.assignedNodeId && updated.walkProgress >= 1) {
+          // Snap position to work cell on arrival (mirrors building worker logic)
+          if (updated.targetX !== null) {
+            updated.x = updated.targetX
+            updated.y = updated.targetY
+            updated.targetX = null
+            updated.targetY = null
+          }
           const node = newNodes.find(n => n.id === updated.assignedNodeId)
           if (node && node.remainingAmount > 0) {
             if (!updated._harvestTimer || updated._harvestTimer <= 0) {
@@ -646,16 +689,35 @@ const useStore = create((set, get) => ({
         return updated
       })
 
+      // Respawn depleted resource nodes after a cooldown (not outposts)
+      const RESPAWN_TICKS = 120 // 2 minutes
+      newNodes = newNodes.map(n => {
+        if (n.type === 'OUTPOST') return n
+        if (n.remainingAmount <= 0 && !n.respawnTimer) {
+          return { ...n, respawnTimer: RESPAWN_TICKS }
+        }
+        if (n.respawnTimer > 0) {
+          const timer = n.respawnTimer - 1
+          if (timer <= 0) {
+            const typeDef = NODE_TYPES[n.type]
+            return { ...n, remainingAmount: typeDef.maxAmount, respawnTimer: 0 }
+          }
+          return { ...n, respawnTimer: timer }
+        }
+        return n
+      })
+
       const newGrid = { ...s.grid }
       Object.keys(newGrid).forEach(key => {
         const val = newGrid[key]
         if (typeof val === 'string' && val.startsWith('node-')) {
           const id = parseInt(val.split('-')[1])
           const node = newNodes.find(n => n.id === id)
-          if (!node || node.remainingAmount <= 0) delete newGrid[key]
+          if (!node) delete newGrid[key]
         }
       })
-      newNodes = newNodes.filter(n => n.remainingAmount > 0)
+      // Only permanently remove depleted outposts
+      newNodes = newNodes.filter(n => n.type !== 'OUTPOST' || n.remainingAmount > 0)
 
       const newBuildings = s.buildings.map((b) => {
         if (b.status === 'assigned' && b.assignedVillager) {
@@ -754,22 +816,36 @@ const useStore = create((set, get) => ({
         }
       }
 
-      // --- Combat & Threat (Phase 4) ---
+      // --- Combat & Random Enemy Spawns (Phase 4) ---
       let activeBuildings = newBuildings.filter(b => b.status === 'active')
-      const steamProduction = activeBuildings.reduce((acc, b) => acc + (BUILDINGS[b.type].produces?.steam || 0), 0)
-      let threatMeter = Math.min(100, s.threatMeter + steamProduction * 0.05 + 0.1)
+      const gameTick = s.gameTick + 1
       let newEnemies = [...s.enemies]
 
-      if (threatMeter >= 100) {
-        threatMeter = 0
-        const chronicle = "ALARM! Raiders have been spotted approaching from the wastes!"
+      // Random enemy spawns that scale with game progression
+      // Base chance starts at 0.5% per tick, increases over time
+      const progressionMinutes = gameTick / 60
+      const spawnChance = Math.min(0.05, 0.005 + progressionMinutes * 0.002)
+      // Spawn more enemies at once as game progresses
+      const maxSpawnCount = 1 + Math.floor(progressionMinutes / 5)
+
+      // Cap active enemies based on villager count — at most villagerCount + 1
+      const maxActiveEnemies = newVillagers.length + 1
+      if (Math.random() < spawnChance && newEnemies.length < maxActiveEnemies) {
+        const spawnBudget = maxActiveEnemies - newEnemies.length
+        const spawnCount = Math.min(1 + Math.floor(Math.random() * maxSpawnCount), spawnBudget)
+        const chronicle = spawnCount > 1
+          ? `ALARM! A band of ${spawnCount} raiders emerges from the wastes!`
+          : "ALARM! A raider has been spotted approaching from the wastes!"
         newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
-        const distPlot = s.unlockedPlots[Math.floor(Math.random()*s.unlockedPlots.length)]
-        const ex = distPlot.x * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
-        const ey = distPlot.y * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
-        newEnemies.push({
-          id: Date.now(), x: ex, y: ey, targetX: 4, targetY: 4, health: 50, maxHealth: 50, type: 'raider', speed: 0.05
-        })
+        for (let i = 0; i < spawnCount; i++) {
+          const distPlot = s.unlockedPlots[Math.floor(Math.random()*s.unlockedPlots.length)]
+          const ex = distPlot.x * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
+          const ey = distPlot.y * PLOT_SIZE + (Math.random() > 0.5 ? PLOT_SIZE : 0)
+          const enemyHealth = 50 + Math.floor(progressionMinutes * 5)
+          newEnemies.push({
+            id: Date.now() + i, x: ex, y: ey, targetX: 4, targetY: 4, health: enemyHealth, maxHealth: enemyHealth, type: 'raider', speed: 0.05
+          })
+        }
       }
 
       // Watchtower slow: enemies in range of a watchtower move at half speed
@@ -928,6 +1004,12 @@ const useStore = create((set, get) => ({
           target = nearest
         }
         if (target) {
+          // Clear walk system state so it doesn't conflict with direct position mutation
+          if (v.targetX !== null || v.targetY !== null) {
+            v.targetX = null
+            v.targetY = null
+            v.walkProgress = 1
+          }
           const dx = target.x - v.x
           const dy = target.y - v.y
           const dist = Math.sqrt(dx * dx + dy * dy)
@@ -998,7 +1080,8 @@ const useStore = create((set, get) => ({
             id: Date.now(),
             name: 'Wanderer ' + (currentPop + 1),
             personality: ['diligent', 'lazy', 'hothead', 'cheerful'][Math.floor(Math.random() * 4)],
-            mood: 'happy'
+            mood: 'happy',
+            modelUrl: pickCharacterModel(),
           }
           const chronicle = `A weary traveler named ${pendingWanderer.name} waits at the gates.`
           newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
@@ -1040,11 +1123,17 @@ const useStore = create((set, get) => ({
             const chronicle = getMoodChronicle('feud', { villager: shuffled[0].name, target: shuffled[1].name })
             if (chronicle) newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
             playRandomEvent()
+            // Cooldown so zero-duration events don't allow immediate re-roll
+            activeRandomEvent = eventKey
+            randomEventTimer = 30
           } else if (eventKey === 'morale_boost') {
             newVillagers.forEach((v) => { v.mood = 'happy'; v.feudTarget = null; v.moodTimer = 30 })
             const chronicle = getMoodChronicle('random_event', { event: evt.label })
             if (chronicle) newEvents = [...newEvents, { id: nextEventId++, text: chronicle, timestamp: Date.now() }]
             playRandomEvent()
+            // Cooldown so zero-duration events don't allow immediate re-roll
+            activeRandomEvent = eventKey
+            randomEventTimer = 30
           } else if (evt.duration > 0) {
             activeRandomEvent = eventKey
             randomEventTimer = evt.duration
@@ -1063,7 +1152,7 @@ const useStore = create((set, get) => ({
         nodes: newNodes,
         grid: newGrid,
         enemies: newEnemies,
-        threatMeter,
+        gameTick,
         tradeBoostActive,
         tradeBoostTimer,
         resourcePopups: popups,
@@ -1119,10 +1208,11 @@ const useStore = create((set, get) => ({
       homeX: 0, homeY: 0,
       moodTimer: 30,
       assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
-      targetX: 2 + Math.floor(Math.random()*4), targetY: 2 + Math.floor(Math.random()*4), 
+      targetX: 2 + Math.floor(Math.random()*4), targetY: 2 + Math.floor(Math.random()*4),
       walkProgress: 0,
       negotiationCount: 0, restTimer: 0,
       health: 100, maxHealth: 100, isMilitia: false,
+      modelUrl: w.modelUrl || pickCharacterModel(),
     }
     newVillager.homeX = newVillager.targetX
     newVillager.homeY = newVillager.targetY

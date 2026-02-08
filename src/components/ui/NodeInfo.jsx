@@ -127,6 +127,13 @@ export default function NodeInfo() {
             )}
           </div>
 
+          {/* Respawning indicator */}
+          {node.respawnTimer > 0 && (
+            <div className="mb-6 p-3 bg-amber-900/20 border border-amber-500/30 rounded-sm text-center">
+              <p className="text-xs font-bold text-amber-400">Depleted — Respawning in {node.respawnTimer}s</p>
+            </div>
+          )}
+
           {/* Assigned workers */}
           {assignedWorkers.length > 0 && (
             <div className="mb-6 space-y-2">
@@ -155,9 +162,9 @@ export default function NodeInfo() {
             </div>
           )}
 
-          {/* Assignment list — outposts allow multiple, resource nodes allow one */}
-          {(isOutpost || assignedWorkers.length === 0) && (
-            <div className="mb-6">
+          {/* Assignment list — outposts allow multiple, resource nodes allow one; hide when depleted */}
+          {!node.respawnTimer && (isOutpost || assignedWorkers.length === 0) && (
+            <div className="mb-6" data-tutorial="node-assign">
                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-3">
                  {isOutpost ? 'Assign Raiders (Militia Only):' : 'Assign Harvester:'}
                </p>
