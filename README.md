@@ -85,3 +85,7 @@ Epic Adventure Soundtrack for Video Games by Matio888 -- https://freesound.org/s
 Epic Soundtrack for Video Game Adventures by Matio888 -- https://freesound.org/s/789294/ -- License: Attribution 4.0
 
 Special thanks to Kenney for providing these incredible resources to the game dev community!
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for details.
