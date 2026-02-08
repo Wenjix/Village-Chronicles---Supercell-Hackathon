@@ -205,6 +205,9 @@ export default function BuildingInfo() {
                          <span className="text-[10px] font-black uppercase shrink-0 ml-2" style={{ color: MOODS[v.mood]?.color }}>
                            {MOODS[v.mood]?.label}
                          </span>
+                         <span className="text-[9px] text-zinc-500 uppercase tracking-tight ml-2 shrink-0">
+                           {Math.round((MOODS[v.mood]?.refusalChance || 0) * 100)}% refuse
+                         </span>
                        </button>
                      )
                    })}

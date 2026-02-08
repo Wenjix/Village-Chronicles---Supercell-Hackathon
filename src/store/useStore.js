@@ -404,6 +404,22 @@ const useStore = create((set, get) => ({
     if (villager.assignedBuildingId || villager.assignedNodeId) {
       get().unassignVillager(villagerId)
     }
+    // Check for refusal
+    if (villager.negotiationCount < 3 && rollRefusal(villager.mood)) {
+      playRefusal()
+      const chronicle = getMoodChronicle('refusal', {
+        villager: villager.name,
+        building: NODE_TYPES[node.type]?.name || node.type,
+        mood: villager.mood,
+      })
+      if (chronicle) {
+        set((s) => ({
+          events: [...s.events, { id: nextEventId++, text: chronicle, timestamp: Date.now() }],
+        }))
+      }
+      return { success: false, reason: 'refused', mood: villager.mood }
+    }
+
 
     // Pick adjacent cell
     const adjacentOffsets = [

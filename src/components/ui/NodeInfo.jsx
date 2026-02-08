@@ -9,7 +9,7 @@ export default function NodeInfo() {
   const nodes = useStore((s) => s.nodes)
   const villagers = useStore((s) => s.villagers)
   const buildings = useStore((s) => s.buildings)
-  const closeInfo = useStore((s) => s.closeInfo)
+  const closeInfo = useStore((s) => s.closeInfo)  const openChat = useStore((s) => s.openChat)
   const assignVillagerToNode = useStore((s) => s.assignVillagerToNode)
   const unassignVillager = useStore((s) => s.unassignVillager)
 
@@ -39,7 +39,10 @@ export default function NodeInfo() {
 
   function handleAssign(villagerId) {
     if (!node) return
-    assignVillagerToNode(node.id, villagerId)
+    const result = assignVillagerToNode(node.id, villagerId)
+    if (result?.reason === 'refused') {
+      openChat(villagerId)
+    }
   }
 
   return (
@@ -208,6 +211,9 @@ export default function NodeInfo() {
                          </div>
                          <span className="text-[10px] font-black uppercase shrink-0 ml-2" style={{ color: MOODS[v.mood]?.color }}>
                            {MOODS[v.mood]?.label}
+                         </span>
+                         <span className="text-[9px] text-zinc-500 uppercase tracking-tight ml-2 shrink-0">
+                           {Math.round((MOODS[v.mood]?.refusalChance || 0) * 100)}% refuse
                          </span>
                        </button>
                      )
