@@ -6,6 +6,7 @@ import { SkeletonUtils } from 'three-stdlib'
 import { gridToWorld } from '../../utils/gridUtils'
 import useStore from '../../store/useStore'
 import { MOODS } from '../../data/moods'
+import { CHARACTER_MODEL_PATHS, DEFAULT_CHARACTER_MODEL, normalizeCharacterModelUrl } from '../../data/characterModels'
 import characterColormapUrl from '../../models/characters/colormap.png'
 
 export default function NPC({ villager }) {
@@ -30,7 +31,7 @@ export default function NPC({ villager }) {
   const enemies = useStore((s) => s.enemies)
   const buildings = useStore((s) => s.buildings)
   const nodes = useStore((s) => s.nodes)
-  const modelUrl = villager.modelUrl || '/src/models/characters/male/character-male-a.glb'
+  const modelUrl = normalizeCharacterModelUrl(villager.modelUrl || DEFAULT_CHARACTER_MODEL)
   const { scene, animations } = useGLTF(modelUrl)
   const characterColormap = useTexture(characterColormapUrl)
   const { actions } = useAnimations(animations, modelRef)
@@ -364,15 +365,4 @@ export default function NPC({ villager }) {
   )
 }
 
-useGLTF.preload('/src/models/characters/male/character-male-a.glb')
-useGLTF.preload('/src/models/characters/male/character-male-b.glb')
-useGLTF.preload('/src/models/characters/male/character-male-c.glb')
-useGLTF.preload('/src/models/characters/male/character-male-d.glb')
-useGLTF.preload('/src/models/characters/male/character-male-e.glb')
-useGLTF.preload('/src/models/characters/male/character-male-f.glb')
-useGLTF.preload('/src/models/characters/female/character-female-a.glb')
-useGLTF.preload('/src/models/characters/female/character-female-b.glb')
-useGLTF.preload('/src/models/characters/female/character-female-c.glb')
-useGLTF.preload('/src/models/characters/female/character-female-d.glb')
-useGLTF.preload('/src/models/characters/female/character-female-e.glb')
-useGLTF.preload('/src/models/characters/female/character-female-f.glb')
+CHARACTER_MODEL_PATHS.forEach((url) => useGLTF.preload(url))

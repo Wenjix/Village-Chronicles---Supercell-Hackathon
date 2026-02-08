@@ -6,26 +6,11 @@ import { PLOT_SIZE, createEmptyGrid, isValidCell } from '../utils/gridUtils'
 import { playBuildStart, playBuildComplete, playUpgrade, playRefusal, playNegotiateSuccess, playRandomEvent } from '../utils/sounds'
 import { MOODS, rollMoodShift, rollRefusal, getBuildDecrement, getVillageHappiness, rollRandomEvent, RANDOM_EVENTS } from '../data/moods'
 import { NODE_TYPES, getRandomNodeType, GUARANTEED_NODE_TYPES } from '../data/nodes'
+import { normalizeCharacterModelUrl, pickCharacterModel } from '../data/characterModels'
 
 let nextBuildingId = 1
 let nextEventId = 1
 let nextNodeId = 1
-const CHARACTER_MODEL_PATHS = [
-  '/src/models/characters/male/character-male-a.glb',
-  '/src/models/characters/male/character-male-b.glb',
-  '/src/models/characters/male/character-male-c.glb',
-  '/src/models/characters/male/character-male-d.glb',
-  '/src/models/characters/male/character-male-e.glb',
-  '/src/models/characters/male/character-male-f.glb',
-  '/src/models/characters/female/character-female-b.glb',
-  '/src/models/characters/female/character-female-c.glb',
-  '/src/models/characters/female/character-female-d.glb',
-  '/src/models/characters/female/character-female-e.glb',
-  '/src/models/characters/female/character-female-f.glb',
-]
-
-const pickCharacterModel = () =>
-  CHARACTER_MODEL_PATHS[Math.floor(Math.random() * CHARACTER_MODEL_PATHS.length)]
 
 // Default initial state (used for new games and reset)
 const INITIAL_VILLAGERS = [
@@ -33,7 +18,7 @@ const INITIAL_VILLAGERS = [
     id: 1, name: 'Barnaby Cogsworth', role: 'Engineer', x: 2, y: 2,
     homeX: 2, homeY: 2,
     mood: 'happy', personality: 'diligent', moodTimer: 30,
-    modelUrl: '/src/models/characters/male/character-male-a.glb',
+    modelUrl: normalizeCharacterModelUrl('/src/models/characters/male/character-male-a.glb'),
     assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
     targetX: null, targetY: null, walkProgress: 0,
     negotiationCount: 0, restTimer: 0,
@@ -43,7 +28,7 @@ const INITIAL_VILLAGERS = [
     id: 2, name: 'Elara Steamwright', role: 'Alchemist', x: 5, y: 3,
     homeX: 5, homeY: 3,
     mood: 'happy', personality: 'cheerful', moodTimer: 25,
-    modelUrl: '/src/models/characters/female/character-female-b.glb',
+    modelUrl: normalizeCharacterModelUrl('/src/models/characters/female/character-female-b.glb'),
     assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
     targetX: null, targetY: null, walkProgress: 0,
     negotiationCount: 0, restTimer: 0,
@@ -53,7 +38,7 @@ const INITIAL_VILLAGERS = [
     id: 3, name: 'Thaddeus Ironclaw', role: 'Merchant', x: 4, y: 6,
     homeX: 4, homeY: 6,
     mood: 'happy', personality: 'hothead', moodTimer: 20,
-    modelUrl: '/src/models/characters/male/character-male-b.glb',
+    modelUrl: normalizeCharacterModelUrl('/src/models/characters/male/character-male-b.glb'),
     assignedBuildingId: null, assignedNodeId: null, feudTarget: null, rallyTargetId: null,
     targetX: null, targetY: null, walkProgress: 0,
     negotiationCount: 0, restTimer: 0,
@@ -1517,6 +1502,18 @@ const useStore = create(persist((set, get) => ({
   }),
   onRehydrateStorage: () => (state) => {
     if (state) {
+      if (Array.isArray(state.villagers)) {
+        state.villagers = state.villagers.map((v) => ({
+          ...v,
+          modelUrl: normalizeCharacterModelUrl(v.modelUrl),
+        }))
+      }
+      if (state.pendingWanderer) {
+        state.pendingWanderer = {
+          ...state.pendingWanderer,
+          modelUrl: normalizeCharacterModelUrl(state.pendingWanderer.modelUrl),
+        }
+      }
       state._hasHydrated = true
       if (state.gameTick > 0) {
         state._saveLoaded = true
