@@ -170,6 +170,17 @@ export class MockProvider extends BaseLLMProvider {
     return pick(lines)
   }
 
+  async generateWandererBackstory(wanderer) {
+    const backstories = [
+      "I was a sky-pirate once, before the mists took my ship. Now I seek a more grounded life.",
+      "The smog in the Iron Cities became too thick to breathe. I've heard the air here is... manageable.",
+      "I've spent years studying the ancient leylines. Your village is built on a very interesting intersection.",
+      "Just a simple clockmaker looking for a quiet place to practice my craft. No trouble, I promise.",
+      "They call me a 'mad' inventor, but I prefer the term 'radically inspired.' I have many ideas for your settlement."
+    ]
+    return pick(backstories)
+  }
+
   // Legacy compat — old methods redirect through new interface
   async generateDialogue(name, mood = 'happy', feudTarget = null) {
     return this.generateGreeting({ name, mood, feudTarget })

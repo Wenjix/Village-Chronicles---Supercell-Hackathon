@@ -42,6 +42,14 @@ export class BaseLLMProvider {
   }
 
   /**
+   * Generate a wanderer backstory for the recruitment interview.
+   * @returns {string}
+   */
+  async generateWandererBackstory(wanderer) {
+    throw new Error('generateWandererBackstory() not implemented')
+  }
+
+  /**
    * Build the NPC system prompt from context.
    * Shared across providers so the personality stays consistent.
    */

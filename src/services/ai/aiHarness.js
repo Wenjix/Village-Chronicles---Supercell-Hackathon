@@ -104,6 +104,17 @@ export class AIHarness {
     }
   }
 
+  /** Generate wanderer backstory for interview (Phase 3) */
+  async generateWandererBackstory(wanderer) {
+    try {
+      return await this.provider.generateWandererBackstory(wanderer)
+    } catch (err) {
+      console.error('[AIHarness] wanderer error, falling back to mock:', err)
+      const mock = new MockProvider()
+      return mock.generateWandererBackstory(wanderer)
+    }
+  }
+
   // --- Legacy compat (used by store/other code) ---
   async generateDialogue(npcName, mood = 'happy', feudTarget = null) {
     return this.generateGreeting({ name: npcName, mood, feudTarget })
