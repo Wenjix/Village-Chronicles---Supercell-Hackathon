@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Html, useFBX, useTexture } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { CELL_SIZE } from '../../utils/gridUtils'
 import { NODE_TYPES } from '../../data/nodes'
+import useStore from '../../store/useStore'
 
 // Tree models
 import treeUrl from '../../models/trees/tree.fbx'
@@ -18,6 +19,37 @@ import rockSmallUrl from '../../models/rocks/rock-small.fbx'
 import rockWideUrl from '../../models/rocks/rock-wide.fbx'
 
 import colormapUrl from '../../models/colormap.png'
+
+const RESOURCE_ICONS = { wood: '🪵', stone: '🪨', metal: '🔩', water: '💧', gears: '⚙', steam: '☁', crystals: '◆', blueprints: '📜' }
+const RESOURCE_COLORS = { wood: '#b45309', stone: '#78716c', metal: '#94a3b8', water: '#22d3ee', gears: '#b5891c', steam: '#d4d4d8', crystals: '#a855f7', blueprints: '#60a5fa' }
+
+function ResourcePopup({ resource, amount }) {
+  const ref = useRef()
+  const [visible, setVisible] = useState(true)
+  const progress = useRef(0)
+
+  useFrame((_, delta) => {
+    if (!ref.current || !visible) return
+    progress.current += delta
+    ref.current.position.y += delta * 1.2
+    if (progress.current > 1) setVisible(false)
+  })
+
+  if (!visible) return null
+
+  return (
+    <group ref={ref} position={[0, 1.3, 0]}>
+      <Html center style={{ pointerEvents: 'none' }}>
+        <span
+          className="animate-float-up font-bold text-sm whitespace-nowrap resource-popup-badge"
+          style={{ color: RESOURCE_COLORS[resource] || '#fff' }}
+        >
+          +{amount} {RESOURCE_ICONS[resource] || resource}
+        </span>
+      </Html>
+    </group>
+  )
+}
 
 // Simple deterministic hash from grid coords to pick a variant
 function pickVariant(gridX, gridY, count) {
@@ -129,6 +161,9 @@ export default function ResourceNode({ node }) {
   const { gridX, gridY, type, remainingAmount, respawnTimer } = node
   const typeDef = NODE_TYPES[type]
   const isDepleted = remainingAmount <= 0 && respawnTimer > 0
+  const resourcePopups = useStore((s) => s.resourcePopups)
+  const [popups, setPopups] = useState([])
+  const popupKey = useRef(0)
 
   const x = (gridX - 3.5) * CELL_SIZE
   const z = (gridY - 3.5) * CELL_SIZE
@@ -198,6 +233,18 @@ export default function ResourceNode({ node }) {
     pondTexture.offset.x = (pondTexture.offset.x + delta * 0.06) % 1
     pondTexture.offset.y = (pondTexture.offset.y + delta * 0.03) % 1
   })
+
+  useEffect(() => {
+    const mine = resourcePopups.filter((p) => p.nodeId === node.id)
+    if (mine.length > 0) {
+      mine.forEach((p) => {
+        setPopups((prev) => [
+          ...prev.slice(-4),
+          { key: popupKey.current++, resource: p.resource, amount: p.amount },
+        ])
+      })
+    }
+  }, [resourcePopups, node.id])
 
   return (
     <group position={[x, 0, z]}>
@@ -282,6 +329,10 @@ export default function ResourceNode({ node }) {
           <meshStandardMaterial color={typeDef.color} transparent opacity={0.2} />
         </mesh>
       )}
+
+      {popups.map((p) => (
+        <ResourcePopup key={p.key} resource={p.resource} amount={p.amount} />
+      ))}
     </group>
   )
 }

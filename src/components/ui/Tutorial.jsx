@@ -118,12 +118,21 @@ function TutorialTooltip({ step, onSkip }) {
       }
     }
   } else {
-    tooltipStyle = {
-      position: 'fixed',
-      bottom: 100,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 960,
+    if (step.tooltipPosition === 'right') {
+      tooltipStyle = {
+        position: 'fixed',
+        right: 16,
+        bottom: 100,
+        zIndex: 960,
+      }
+    } else {
+      tooltipStyle = {
+        position: 'fixed',
+        bottom: 100,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 960,
+      }
     }
   }
 

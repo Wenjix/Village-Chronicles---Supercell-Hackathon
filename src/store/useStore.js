@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { BUILDINGS, canAfford } from '../data/buildings'
 import { getRandomChronicle, getMoodChronicle } from '../data/chronicles'
 import { PLOT_SIZE, createEmptyGrid, isValidCell } from '../utils/gridUtils'
-import { playBuildStart, playBuildComplete, playUpgrade, playRefusal, playNegotiateSuccess, playRandomEvent } from '../utils/sounds'
+import { playBuildStart, playBuildComplete, playUpgrade, playRefusal, playNegotiateSuccess, playRandomEvent, playHarvestWork, playCombatClash } from '../utils/sounds'
 import { MOODS, rollMoodShift, rollRefusal, getBuildDecrement, getVillageHappiness, rollRandomEvent, RANDOM_EVENTS } from '../data/moods'
 import { NODE_TYPES, getRandomNodeType, GUARANTEED_NODE_TYPES } from '../data/nodes'
 import { normalizeCharacterModelUrl, pickCharacterModel } from '../data/characterModels'
@@ -649,6 +649,8 @@ const useStore = create(persist((set, get) => ({
       const newResources = { ...s.resources }
       const popups = []
       let newNodes = [...s.nodes]
+      let didHarvestSfx = false
+      let didCombatSfx = false
 
       const newVillagers = s.villagers.map((v) => {
         let updated = { ...v }
@@ -710,6 +712,7 @@ const useStore = create(persist((set, get) => ({
               node.remainingAmount -= actualHarvest
               newResources[typeDef.resource] += actualHarvest
               popups.push({ resource: typeDef.resource, amount: actualHarvest, nodeId: node.id })
+              if (actualHarvest > 0) didHarvestSfx = true
               
               updated._harvestTimer = 5
               
@@ -985,6 +988,7 @@ const useStore = create(persist((set, get) => ({
           const dist = Math.sqrt(Math.pow(e.x - t.gridX, 2) + Math.pow(e.y - t.gridY, 2))
           if (dist <= (def.range || 3)) {
              e.health -= (def.damage || 5)
+             didCombatSfx = true
              if (e.health <= 0) {
                 popups.push({ resource: 'crystals', amount: 5, nodeId: 'enemy-' + e.id })
                 newResources.crystals += 5
@@ -1007,6 +1011,7 @@ const useStore = create(persist((set, get) => ({
         })
         if (closestBldg) {
           closestBldg.health -= 5
+          didCombatSfx = true
           if (closestBldg.health <= 0) {
             closestBldg.health = 0
             closestBldg.status = 'destroyed'
@@ -1036,6 +1041,7 @@ const useStore = create(persist((set, get) => ({
           const dist = Math.sqrt(Math.pow(e.x - vx, 2) + Math.pow(e.y - vy, 2))
           if (dist <= 1.5) {
             v.health -= 2
+            didCombatSfx = true
             // Non-militia flee when hit
             if (!v.isMilitia && !v.assignedBuildingId && !v.assignedNodeId) {
               v.targetX = v.homeX
@@ -1052,6 +1058,7 @@ const useStore = create(persist((set, get) => ({
         const villagersAtOutpost = newVillagers.filter(v => v.assignedNodeId === outpost.id && v.walkProgress >= 1)
         if (villagersAtOutpost.length >= 3) {
           outpost.remainingAmount -= villagersAtOutpost.length * 2
+          didCombatSfx = true
           if (outpost.remainingAmount <= 0) {
             newResources.crystals += 100
             newResources.blueprints += 10
@@ -1119,8 +1126,9 @@ const useStore = create(persist((set, get) => ({
           newEnemies.forEach(e => {
             const dist = Math.sqrt(Math.pow(e.x - v.x, 2) + Math.pow(e.y - v.y, 2))
             if (dist <= 1.5) {
-              e.health -= 2
+              e.health -= 4
               inCombat = true
+              didCombatSfx = true
             }
           })
           // Passive regen: militia not in combat regen 1 HP/tick
@@ -1234,6 +1242,9 @@ const useStore = create(persist((set, get) => ({
           }
         }
       }
+
+      if (didHarvestSfx) playHarvestWork()
+      if (didCombatSfx) playCombatClash()
 
       return {
         buildings: standingBuildings,

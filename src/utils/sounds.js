@@ -15,6 +15,8 @@ let transitionTimeout = null
 let fadeInterval = null
 let unlockBound = false
 let musicMuted = false
+let lastHarvestSfxAt = 0
+let lastCombatSfxAt = 0
 
 try {
   musicMuted = localStorage.getItem(MUSIC_MUTE_STORAGE_KEY) === '1'
@@ -60,6 +62,24 @@ export function playBuildComplete() {
 
 export function playCollect() {
   playTone(600, 0.08, 'sine', 0.1)
+}
+
+export function playHarvestWork() {
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+  if (now - lastHarvestSfxAt < 180) return
+  lastHarvestSfxAt = now
+
+  playTone(360, 0.045, 'triangle', 0.06)
+  setTimeout(() => playTone(540, 0.05, 'triangle', 0.05), 36)
+}
+
+export function playCombatClash() {
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+  if (now - lastCombatSfxAt < 140) return
+  lastCombatSfxAt = now
+
+  playTone(190, 0.035, 'square', 0.085)
+  setTimeout(() => playTone(120, 0.055, 'sawtooth', 0.06), 22)
 }
 
 export function playUpgrade() {
