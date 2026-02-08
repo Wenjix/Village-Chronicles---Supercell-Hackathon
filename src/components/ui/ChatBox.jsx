@@ -259,15 +259,15 @@ export default function ChatBox() {
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.from === 'player' ? 'justify-end' : 'justify-start'}`}>
                   <div className={
-                    msg.from === 'system' ? "w-full text-center py-2 text-[10px] uppercase text-amber-600/60 italic" :
-                    msg.from === 'player' ? "max-w-[85%] bg-blue-900/40 border border-blue-500/30 text-blue-100 px-4 py-2 rounded-sm text-sm" :
-                    "max-w-[85%] bg-[#e2d1a4] text-[#3d2b1f] px-4 py-3 rounded-sm shadow-md text-xs font-serif"
+                    msg.from === 'system' ? "w-full text-center py-2 text-xs uppercase text-amber-600/70 italic leading-relaxed" :
+                    msg.from === 'player' ? "max-w-[85%] bg-blue-900/40 border border-blue-500/30 text-blue-100 px-4 py-2 rounded-sm text-base leading-relaxed" :
+                    "max-w-[85%] bg-[#e2d1a4] text-[#3d2b1f] px-4 py-3 rounded-sm shadow-md text-sm sm:text-base font-serif leading-relaxed"
                   }>
                     {msg.text}
                   </div>
                 </div>
               ))}
-              {loading && <div className="text-[10px] text-zinc-500 italic animate-pulse px-4">TRANSMITTING...</div>}
+              {loading && <div className="text-xs text-zinc-500 italic animate-pulse px-4">TRANSMITTING...</div>}
             </div>
           </div>
 
@@ -279,8 +279,8 @@ export default function ChatBox() {
                   onClick={() => handlePlayerMessage(BRIBE_QUICK_ACTION.message, BRIBE_QUICK_ACTION.action)}
                   className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 hover:border-brass-dim transition-all text-left"
                 >
-                  <span className="text-xs text-zinc-300 italic">"{BRIBE_QUICK_ACTION.message}"</span>
-                  <span className="text-[10px] text-zinc-500">25⚙️</span>
+                  <span className="text-sm text-zinc-300 italic">"{BRIBE_QUICK_ACTION.message}"</span>
+                  <span className="text-xs text-zinc-500">25⚙️</span>
                 </button>
               </div>
             )}
@@ -302,7 +302,7 @@ export default function ChatBox() {
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="TYPE MESSAGE..."
-                  className="flex-1 bg-black border border-brass-dim/40 px-3 py-2 text-xs text-amber-100 outline-none"
+                  className="flex-1 bg-black border border-brass-dim/40 px-3 py-2 text-sm text-amber-100 outline-none"
                 />
                 <button
                   onClick={() => handlePlayerMessage(inputText, 'talk')}

@@ -1489,7 +1489,7 @@ const useStore = create(persist((set, get) => ({
       },
     })
     // Spawn initial nodes for the fresh game
-    get().spawnNodes(0, 0, 5)
+    get().spawnNodes(0, 0, GUARANTEED_NODE_TYPES.length)
   },
 }), {
   name: 'village-chronicles-save',

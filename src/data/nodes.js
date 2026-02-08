@@ -42,5 +42,10 @@ export const getRandomNodeType = () => {
   return HARVESTABLE_TYPES[Math.floor(Math.random() * HARVESTABLE_TYPES.length)];
 };
 
-// Guaranteed types for starting plot: one of each raw resource
-export const GUARANTEED_NODE_TYPES = ['WOOD', 'STONE', 'METAL', 'WATER'];
+// Guaranteed types for starting plot: at least two of each raw resource
+export const GUARANTEED_NODE_TYPES = [
+  'WOOD', 'WOOD',
+  'STONE', 'STONE',
+  'METAL', 'METAL',
+  'WATER', 'WATER',
+];
