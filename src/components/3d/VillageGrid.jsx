@@ -1,39 +1,60 @@
 import * as THREE from 'three'
-import { GRID_SIZE, CELL_SIZE } from '../../utils/gridUtils'
+import { PLOT_SIZE, CELL_SIZE, gridToWorld } from '../../utils/gridUtils'
 import GridCell from './GridCell'
+import ResourceNode from './ResourceNode'
 import useStore from '../../store/useStore'
 
-const gridTotalSize = GRID_SIZE * CELL_SIZE
-const borderGeo = new THREE.EdgesGeometry(
-  new THREE.BoxGeometry(gridTotalSize, 0.01, gridTotalSize)
-)
-
-export default function VillageGrid() {
+function Plot({ px, py }) {
   const grid = useStore((s) => s.grid)
   const cells = []
 
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < PLOT_SIZE; y++) {
+    for (let x = 0; x < PLOT_SIZE; x++) {
+      const gx = px * PLOT_SIZE + x
+      const gy = py * PLOT_SIZE + y
+      const key = `${gx},${gy}`
+      const isOccupied = grid[key] !== undefined
       cells.push(
-        <GridCell key={`${x}-${y}`} x={x} y={y} occupied={grid[y][x] !== null} />
+        <GridCell key={key} x={gx} y={gy} occupied={isOccupied} />
       )
     }
   }
 
+  // Plot border
+  const plotTotalSize = PLOT_SIZE * CELL_SIZE
+  const [cx, , cz] = gridToWorld(px * PLOT_SIZE + (PLOT_SIZE-1)/2, py * PLOT_SIZE + (PLOT_SIZE-1)/2)
+  
   return (
     <group>
-      {/* Ground plane */}
+      {cells}
+      <lineSegments position={[cx, 0.02, cz]}>
+        <boxGeometry args={[plotTotalSize, 0.01, plotTotalSize]} />
+        <lineBasicMaterial color="#334155" opacity={0.5} transparent />
+      </lineSegments>
+    </group>
+  )
+}
+
+export default function VillageGrid() {
+  const unlockedPlots = useStore((s) => s.unlockedPlots)
+  const nodes = useStore((s) => s.nodes)
+
+  return (
+    <group>
+      {/* Ground plane (large enough for now) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <planeGeometry args={[gridTotalSize + 4, gridTotalSize + 4]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.2} roughness={0.9} />
+        <planeGeometry args={[100, 100]} />
+        <meshStandardMaterial color="#0b0f19" metalness={0.1} roughness={1.0} />
       </mesh>
 
-      {/* Grid border */}
-      <lineSegments position={[0, 0.02, 0]} geometry={borderGeo}>
-        <lineBasicMaterial color="#334155" />
-      </lineSegments>
+      {unlockedPlots.map((p) => (
+        <Plot key={`${p.x},${p.y}`} px={p.x} py={p.y} />
+      ))}
 
-      {cells}
+      {/* Resource Nodes */}
+      {nodes.map((node) => (
+        <ResourceNode key={`node-${node.id}`} node={node} />
+      ))}
     </group>
   )
 }

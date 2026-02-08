@@ -77,10 +77,14 @@ export default function NPC({ villager }) {
         </mesh>
       )}
 
-      {/* Body capsule — colored by mood */}
+      {/* Body capsule — colored by mood or militia state */}
       <mesh position={[0, 0, 0]}>
         <capsuleGeometry args={[0.1, 0.2, 4, 8]} />
-        <meshStandardMaterial color={moodDef.color} metalness={0.3} roughness={0.6} />
+        <meshStandardMaterial 
+          color={villager.isMilitia ? "#ef4444" : moodDef.color} 
+          metalness={villager.isMilitia ? 0.8 : 0.3} 
+          roughness={0.6} 
+        />
       </mesh>
       {/* Head */}
       <mesh position={[0, 0.25, 0]}>
@@ -100,6 +104,18 @@ export default function NPC({ villager }) {
           {feudTargetName && (
             <div className="text-[9px] text-red-400 whitespace-nowrap text-center mt-0.5 bg-black/60 px-1 rounded">
               vs {feudTargetName}
+            </div>
+          )}
+          {/* Health bar for damaged villagers */}
+          {villager.health < villager.maxHealth && (
+            <div className="w-12 h-1 bg-black/70 rounded-full overflow-hidden border border-red-900/50 mt-0.5">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${(villager.health / villager.maxHealth) * 100}%`,
+                  backgroundColor: villager.health / villager.maxHealth > 0.5 ? '#22c55e' : villager.health / villager.maxHealth > 0.25 ? '#f59e0b' : '#ef4444',
+                }}
+              />
             </div>
           )}
         </div>

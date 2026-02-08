@@ -5,8 +5,8 @@ import { BUILDINGS, BUILDING_TYPES } from '../../data/buildings'
 import { gridToWorld } from '../../utils/gridUtils'
 import useStore from '../../store/useStore'
 
-const RESOURCE_ICONS = { gears: '\u2699', steam: '\u2601', crystals: '\u25c6' }
-const RESOURCE_COLORS = { gears: '#b5891c', steam: '#d4d4d8', crystals: '#a855f7' }
+const RESOURCE_ICONS = { wood: '🪵', stone: '🪨', metal: '🔩', water: '💧', gears: '⚙', steam: '☁', crystals: '◆', blueprints: '📜' }
+const RESOURCE_COLORS = { wood: '#b45309', stone: '#78716c', metal: '#94a3b8', water: '#22d3ee', gears: '#b5891c', steam: '#d4d4d8', crystals: '#a855f7', blueprints: '#60a5fa' }
 
 function ResourcePopup({ resource, amount }) {
   const ref = useRef()
@@ -202,12 +202,86 @@ function InventorsWorkshop({ active }) {
   )
 }
 
+function ExplorersGuild({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.4, 0.5, 0.6, 6]} />
+        <meshStandardMaterial color="#10b981" metalness={0.4} roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.7, 0]}>
+        <coneGeometry args={[0.45, 0.4, 6]} />
+        <meshStandardMaterial color="#065f46" />
+      </mesh>
+      {active && <RotatingGear position={[0, 0.9, 0]} size={0.15} />}
+    </group>
+  )
+}
+
+function Cottage({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.25, 0]}>
+        <boxGeometry args={[0.6, 0.5, 0.6]} />
+        <meshStandardMaterial color="#f59e0b" metalness={0.2} roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.6, 0]} rotation={[0, Math.PI/4, 0]}>
+        <coneGeometry args={[0.5, 0.4, 4]} />
+        <meshStandardMaterial color="#b45309" />
+      </mesh>
+    </group>
+  )
+}
+
+function TeslaTower({ active }) {
+  const ringRef = useRef()
+  useFrame((state) => {
+    if (ringRef.current && active) {
+      ringRef.current.rotation.y = state.clock.elapsedTime * 5
+      ringRef.current.position.y = 0.8 + Math.sin(state.clock.elapsedTime * 10) * 0.05
+    }
+  })
+  return (
+    <group>
+      <mesh position={[0, 0.4, 0]}>
+        <cylinderGeometry args={[0.1, 0.2, 0.8, 8]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.2} />
+      </mesh>
+      <mesh ref={ringRef} position={[0, 0.8, 0]}>
+        <torusGeometry args={[0.2, 0.05, 8, 16]} />
+        <meshStandardMaterial color="#38bdf8" emissive="#38bdf8" emissiveIntensity={active ? 1 : 0} />
+      </mesh>
+      {active && <pointLight position={[0, 0.8, 0]} color="#38bdf8" intensity={2} distance={4} />}
+    </group>
+  )
+}
+
+function Watchtower({ active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.6, 0]}>
+        <cylinderGeometry args={[0.15, 0.25, 1.2, 4]} />
+        <meshStandardMaterial color="#78350f" />
+      </mesh>
+      <mesh position={[0, 1.3, 0]}>
+        <boxGeometry args={[0.5, 0.2, 0.5]} />
+        <meshStandardMaterial color="#451a03" />
+      </mesh>
+      {active && <pointLight position={[0, 1.4, 0]} color="#fbbf24" intensity={0.5} distance={5} />}
+    </group>
+  )
+}
+
 const BUILDING_COMPONENTS = {
   [BUILDING_TYPES.CLOCKWORK_FORGE]: ClockworkForge,
   [BUILDING_TYPES.STEAM_MILL]: SteamMill,
   [BUILDING_TYPES.CRYSTAL_REFINERY]: CrystalRefinery,
   [BUILDING_TYPES.AIRSHIP_DOCK]: AirshipDock,
   [BUILDING_TYPES.INVENTORS_WORKSHOP]: InventorsWorkshop,
+  [BUILDING_TYPES.EXPLORERS_GUILD]: ExplorersGuild,
+  [BUILDING_TYPES.COTTAGE]: Cottage,
+  [BUILDING_TYPES.TESLA_TOWER]: TeslaTower,
+  [BUILDING_TYPES.WATCHTOWER]: Watchtower,
 }
 
 export default function Building({ building }) {
@@ -346,6 +420,22 @@ export default function Building({ building }) {
       {isAssigned && (
         <Html position={[0, 1.2, 0]} center style={{ pointerEvents: 'none' }}>
           <span className="world-badge world-badge-blue">WORKER EN ROUTE</span>
+        </Html>
+      )}
+      {/* Health bar for damaged buildings */}
+      {building.health < building.maxHealth && building.status !== 'proposed' && building.status !== 'assigned' && (
+        <Html position={[0, 1.5, 0]} center style={{ pointerEvents: 'none' }}>
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-1.5 bg-black/70 rounded-full overflow-hidden border border-red-900/50">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${(building.health / building.maxHealth) * 100}%`,
+                  backgroundColor: building.health / building.maxHealth > 0.5 ? '#22c55e' : building.health / building.maxHealth > 0.25 ? '#f59e0b' : '#ef4444',
+                }}
+              />
+            </div>
+          </div>
         </Html>
       )}
       {popups.map((p) => (

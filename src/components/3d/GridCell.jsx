@@ -5,7 +5,12 @@ import useStore from '../../store/useStore'
 export default function GridCell({ x, y, occupied }) {
   const [hovered, setHovered] = useState(false)
   const selectCell = useStore((s) => s.selectCell)
+  const grid = useStore((s) => s.grid)
   const [wx, , wz] = gridToWorld(x, y)
+
+  const key = `${x},${y}`
+  const isNode = typeof grid[key] === 'string' && grid[key].startsWith('node-')
+  const clickable = !occupied || isNode
 
   return (
     <mesh
@@ -13,11 +18,11 @@ export default function GridCell({ x, y, occupied }) {
       rotation={[-Math.PI / 2, 0, 0]}
       onClick={(e) => {
         e.stopPropagation()
-        if (!occupied) selectCell(x, y)
+        if (clickable) selectCell(x, y)
       }}
       onPointerOver={(e) => {
         e.stopPropagation()
-        if (!occupied) {
+        if (clickable) {
           setHovered(true)
           document.body.style.cursor = 'pointer'
         }
@@ -29,9 +34,9 @@ export default function GridCell({ x, y, occupied }) {
     >
       <planeGeometry args={[CELL_SIZE * 0.95, CELL_SIZE * 0.95]} />
       <meshStandardMaterial
-        color={hovered && !occupied ? '#2563eb' : '#1e293b'}
+        color={hovered && clickable ? '#2563eb' : '#1e293b'}
         transparent
-        opacity={hovered && !occupied ? 0.5 : 0.15}
+        opacity={hovered && clickable ? 0.5 : 0.15}
         metalness={0.3}
         roughness={0.7}
       />
