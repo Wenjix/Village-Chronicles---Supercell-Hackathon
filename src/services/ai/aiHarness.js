@@ -6,8 +6,11 @@ import { MistralProvider } from './providers/mistralProvider.js'
  *
  * Provider is auto-detected from env vars:
  *   VITE_AI_PROVIDER = 'mistral' | 'mock' (default: auto)
- *   VITE_MISTRAL_API_KEY = your key
  *   VITE_MISTRAL_MODEL = model name (default: mistral-small-latest)
+ *
+ * Server-side requirements for mistral mode:
+ *   MISTRAL_API_KEY = your key (server env only)
+ *   MISTRAL_MODEL   = optional server default model
  *
  * To add a new provider:
  *   1. Create src/services/ai/providers/yourProvider.js extending BaseLLMProvider
@@ -22,21 +25,16 @@ export class AIHarness {
 
   createProvider() {
     const explicit = import.meta.env.VITE_AI_PROVIDER
-    const mistralKey = import.meta.env.VITE_MISTRAL_API_KEY
+    const model = import.meta.env.VITE_MISTRAL_MODEL
 
     // Explicit provider selection
     if (explicit === 'mock') return new MockProvider()
-    if (explicit === 'mistral' && mistralKey) {
-      return new MistralProvider(mistralKey, import.meta.env.VITE_MISTRAL_MODEL)
+    if (explicit === 'mistral') {
+      return new MistralProvider(model)
     }
 
-    // Auto-detect: use real provider if key is present, otherwise mock
-    if (mistralKey) {
-      return new MistralProvider(mistralKey, import.meta.env.VITE_MISTRAL_MODEL)
-    }
-
-    console.log('[AIHarness] No API key found, using mock provider. Set VITE_MISTRAL_API_KEY in .env to enable LLM.')
-    return new MockProvider()
+    // Default to mistral proxy; individual calls already fall back to mock on error.
+    return new MistralProvider(model)
   }
 
   /**

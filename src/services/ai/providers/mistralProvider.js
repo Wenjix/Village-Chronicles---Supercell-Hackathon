@@ -1,21 +1,20 @@
 import { BaseLLMProvider } from './baseLLMProvider.js'
 
-const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions'
+const MISTRAL_PROXY_URL = '/api/mistral-chat'
 const DEFAULT_MODEL = 'mistral-small-latest'
 
 export class MistralProvider extends BaseLLMProvider {
-  constructor(apiKey, model = DEFAULT_MODEL) {
+  constructor(model = DEFAULT_MODEL, proxyUrl = MISTRAL_PROXY_URL) {
     super()
-    this.apiKey = apiKey
     this.model = model
+    this.proxyUrl = proxyUrl
   }
 
   async _call(messages) {
-    const res = await fetch(MISTRAL_API_URL, {
+    const res = await fetch(this.proxyUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
         model: this.model,
@@ -26,12 +25,18 @@ export class MistralProvider extends BaseLLMProvider {
     })
 
     if (!res.ok) {
-      const err = await res.text().catch(() => res.statusText)
-      throw new Error(`Mistral API error ${res.status}: ${err}`)
+      let errText = res.statusText
+      try {
+        const errJson = await res.json()
+        errText = errJson?.error || errText
+      } catch {
+        // no-op
+      }
+      throw new Error(`Mistral proxy error ${res.status}: ${errText}`)
     }
 
     const data = await res.json()
-    return data.choices?.[0]?.message?.content?.trim() || ''
+    return data?.content?.trim?.() || ''
   }
 
   async chat(npcContext, playerMessage) {
