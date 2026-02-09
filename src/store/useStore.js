@@ -307,9 +307,9 @@ const useStore = create(persist((set, get) => ({
     if (!villager) return false
 
     set((s) => ({
-      // If assigned to a building that was in proposed/assigned state, revert it
+      // If assigned to a building in transit or under construction, make it re-assignable.
       buildings: s.buildings.map((b) =>
-        b.assignedVillager === villagerId && (b.status === 'assigned')
+        b.assignedVillager === villagerId && (b.status === 'assigned' || b.status === 'building')
           ? { ...b, status: 'proposed', assignedVillager: null }
           : b
       ),
@@ -1369,15 +1369,28 @@ const useStore = create(persist((set, get) => ({
     const state = get()
     const villager = state.villagers.find(v => v.id === villagerId)
     if (!villager) return false
-    const wasMilitia = villager.isMilitia
+    const nextIsMilitia = !villager.isMilitia
+    const hasActiveEnemies = state.enemies.length > 0
 
-    // When un-drafting, clear assignments and send home
-    if (wasMilitia && (villager.assignedBuildingId || villager.assignedNodeId)) {
+    // Switching role should always clear work assignments first.
+    if (villager.assignedBuildingId || villager.assignedNodeId) {
       get().unassignVillager(villagerId)
     }
 
     set((s) => ({
-      villagers: s.villagers.map(v => v.id === villagerId ? { ...v, isMilitia: !v.isMilitia } : v)
+      villagers: s.villagers.map((v) =>
+        v.id === villagerId
+          ? {
+              ...v,
+              isMilitia: nextIsMilitia,
+              // Prevent stale rally orders from surviving discharge.
+              rallyTargetId: nextIsMilitia ? v.rallyTargetId : null,
+              ...(nextIsMilitia && hasActiveEnemies
+                ? { targetX: null, targetY: null, walkProgress: 1 }
+                : {}),
+            }
+          : v
+      )
     }))
     return true
   },
@@ -1415,7 +1428,7 @@ const useStore = create(persist((set, get) => ({
     set((s) => ({
       villagers: s.villagers.map(v => (
         v.isMilitia && !v.assignedBuildingId && !v.assignedNodeId
-          ? { ...v, rallyTargetId: enemyId }
+          ? { ...v, rallyTargetId: enemyId, targetX: null, targetY: null, walkProgress: 1 }
           : v
       ))
     }))

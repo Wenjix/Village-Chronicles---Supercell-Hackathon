@@ -95,9 +95,10 @@ export default function NPC({ villager }) {
         : null,
     [villager.targetX, villager.targetY]
   )
+  const hasWorkAssignment = !!(villager.assignedBuildingId || villager.assignedNodeId)
   const isMoving = !!(targetPos && villager.walkProgress < 1)
-  const isPursuing = !!(villager.isMilitia && !targetPos && enemies.length > 0)
-  const isWorking = !!((villager.assignedBuildingId || villager.assignedNodeId) && !isMoving && !isPursuing)
+  const isPursuing = !!(villager.isMilitia && !hasWorkAssignment && !targetPos && enemies.length > 0)
+  const isWorking = !!(hasWorkAssignment && !isMoving && !isPursuing)
   const isAttacking = useMemo(() => {
     if (!villager.isMilitia || enemies.length === 0) return false
     return enemies.some((e) => {

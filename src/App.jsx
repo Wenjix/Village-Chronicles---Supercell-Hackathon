@@ -13,7 +13,7 @@ import Tutorial from './components/ui/Tutorial'
 import ResumeModal from './components/ui/ResumeModal'
 import useStore from './store/useStore'
 import { startBackgroundMusic } from './utils/sounds'
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from '@vercel/analytics/react'
 
 export default function App() {
   const tick = useStore((s) => s.tick)
