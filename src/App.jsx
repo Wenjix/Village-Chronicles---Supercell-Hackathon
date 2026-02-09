@@ -13,6 +13,7 @@ import Tutorial from './components/ui/Tutorial'
 import ResumeModal from './components/ui/ResumeModal'
 import useStore from './store/useStore'
 import { startBackgroundMusic } from './utils/sounds'
+import { Analytics } from "@vercel/analytics/next"
 
 export default function App() {
   const tick = useStore((s) => s.tick)
@@ -45,6 +46,7 @@ export default function App() {
 
   return (
     <div className="w-full h-full relative">
+      <Analytics />
       <GameScene />
       <TopBar />
       <Chronicle />
